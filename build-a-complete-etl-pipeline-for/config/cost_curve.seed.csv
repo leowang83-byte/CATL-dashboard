@@ -1,0 +1,10 @@
+project_name,country,as_of_date,cash_cost_usd_t_lce,sustaining_cost_usd_t_lce,all_in_cost_usd_t_lce,production_t_lce,source
+Greenbushes,Australia,2026-05-27,4200,5600,7200,160000,internal_seed
+Pilgangoora,Australia,2026-05-27,6200,7700,9400,68000,internal_seed
+Mt Cattlin,Australia,2026-05-27,7100,8600,10500,22000,internal_seed
+Salar de Atacama,Chile,2026-05-27,3600,4800,6500,210000,internal_seed
+Cauchari-Olaroz,Argentina,2026-05-27,5200,6900,8900,40000,internal_seed
+Thacker Pass,United States,2026-05-27,6800,8500,10800,80000,internal_seed
+Manono,Democratic Republic of Congo,2026-05-27,5900,7400,9600,70000,internal_seed
+Kathleen Valley,Australia,2026-05-27,6400,7900,9900,50000,internal_seed
+

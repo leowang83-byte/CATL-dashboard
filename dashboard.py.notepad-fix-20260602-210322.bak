@@ -1,0 +1,2441 @@
+from pathlib import Path
+
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+import pydeck as pdk
+
+
+# =========================
+# 基础配置
+# =========================
+
+REPORTS_DIR = Path("reports")
+
+CATL_BLUE = "#003A8C"
+CATL_BLUE_2 = "#0052CC"
+LIGHT_BLUE = "#EAF2FF"
+PAGE_BG = "#F7F9FC"
+CARD_BG = "#FFFFFF"
+BORDER = "#D9E2F2"
+TEXT_DARK = "#1F2937"
+TEXT_MUTED = "#64748B"
+GREEN = "#16A34A"
+ORANGE = "#F59E0B"
+RED = "#DC2626"
+
+
+st.set_page_config(
+    page_title="全球锂资源智能决策驾驶舱",
+    page_icon="🔋",
+    layout="wide",
+)
+
+
+# =========================
+# 全局样式
+# =========================
+
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-color: {PAGE_BG};
+        color: {TEXT_DARK};
+    }}
+
+    div[data-testid="stSidebar"] {{
+        background-color: #FFFFFF;
+        border-right: 1px solid {BORDER};
+    }}
+
+    .main-title {{
+        font-size: 34px;
+        font-weight: 800;
+        color: {CATL_BLUE};
+        margin-bottom: 4px;
+        letter-spacing: 0.5px;
+    }}
+
+    .sub-title {{
+        font-size: 15px;
+        color: {TEXT_MUTED};
+        margin-bottom: 12px;
+    }}
+
+    .catl-logo {{
+        font-size: 28px;
+        font-weight: 900;
+        color: {CATL_BLUE};
+        text-align: right;
+        letter-spacing: 1px;
+    }}
+
+    .section-title {{
+        background: linear-gradient(90deg, {CATL_BLUE}, {CATL_BLUE_2});
+        color: white !important;
+        padding: 8px 14px;
+        border-radius: 8px 8px 0px 0px;
+        font-size: 20px;
+        font-weight: 800;
+        margin-top: 18px;
+        margin-bottom: 0px;
+    }}
+
+    .section-card {{
+        background-color: {CARD_BG};
+        border: 1px solid {BORDER};
+        border-radius: 0px 0px 12px 12px;
+        padding: 18px;
+        margin-bottom: 18px;
+        box-shadow: 0 2px 8px rgba(0, 58, 140, 0.06);
+    }}
+
+    .kpi-card {{
+        background-color: {CARD_BG};
+        border: 1px solid {BORDER};
+        border-left: 6px solid {CATL_BLUE_2};
+        border-radius: 12px;
+        padding: 16px 18px;
+        min-height: 118px;
+        box-shadow: 0 2px 8px rgba(0, 58, 140, 0.07);
+    }}
+
+    .kpi-label {{
+        font-size: 14px;
+        color: {TEXT_MUTED};
+        font-weight: 600;
+        margin-bottom: 8px;
+    }}
+
+    .kpi-value {{
+        font-size: 30px;
+        color: {CATL_BLUE};
+        font-weight: 900;
+        line-height: 1.1;
+        white-space: normal;
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }}
+
+    .kpi-note {{
+        font-size: 12px;
+        color: {TEXT_MUTED};
+        margin-top: 8px;
+        line-height: 1.35;
+    }}
+
+    .compact-card {{
+        background-color: #FFFFFF;
+        border: 1px solid {BORDER};
+        border-radius: 12px;
+        padding: 12px 14px;
+        min-height: 92px;
+        box-shadow: 0 2px 6px rgba(0, 58, 140, 0.05);
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }}
+
+    .compact-label {{
+        font-size: 13px;
+        color: {TEXT_MUTED};
+        font-weight: 700;
+        margin-bottom: 8px;
+        line-height: 1.3;
+    }}
+
+    .compact-value {{
+        font-size: 22px;
+        color: {CATL_BLUE};
+        font-weight: 900;
+        line-height: 1.25;
+        white-space: normal;
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }}
+
+    .compact-note {{
+        font-size: 11px;
+        color: {TEXT_MUTED};
+        margin-top: 6px;
+        line-height: 1.3;
+    }}
+
+    .insight-box {{
+        background-color: {LIGHT_BLUE};
+        border: 1px solid #BFD7FF;
+        border-left: 6px solid {CATL_BLUE_2};
+        border-radius: 10px;
+        padding: 14px 16px;
+        color: {TEXT_DARK};
+        font-size: 15px;
+        line-height: 1.7;
+        margin-bottom: 14px;
+    }}
+
+    .strategy-box {{
+        background-color: #F8FAFC;
+        border: 1px solid {BORDER};
+        border-radius: 10px;
+        padding: 14px 16px;
+        color: {TEXT_DARK};
+        font-size: 15px;
+        line-height: 1.7;
+        margin-bottom: 12px;
+    }}
+
+    .small-muted {{
+        color: {TEXT_MUTED};
+        font-size: 12px;
+    }}
+
+    div[data-testid="stMetric"] {{
+        background-color: #FFFFFF;
+        border: 1px solid {BORDER};
+        border-radius: 12px;
+        padding: 14px 16px;
+        box-shadow: 0 2px 6px rgba(0, 58, 140, 0.05);
+    }}
+
+    div[data-testid="stMetricLabel"] {{
+        color: {TEXT_MUTED};
+        font-weight: 700;
+    }}
+
+    div[data-testid="stMetricValue"] {{
+        color: {CATL_BLUE};
+        font-weight: 900;
+    }}
+
+    h1, h2, h3, h4, h5, h6, p, span, label {{
+        color: {TEXT_DARK};
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# =========================
+# 工具函数
+# =========================
+
+def load_csv(file_name):
+    file_path = REPORTS_DIR / file_name
+
+    if not file_path.exists():
+        return pd.DataFrame()
+
+    try:
+        return pd.read_csv(file_path)
+    except Exception:
+        return pd.DataFrame()
+
+
+def get_float(row, col, default=0.0):
+    try:
+        return float(row.get(col, default))
+    except Exception:
+        return default
+
+
+def safe_num(value, default=0.0):
+    try:
+        if pd.isna(value):
+            return default
+        return float(value)
+    except Exception:
+        return default
+
+
+def format_wan(value):
+    try:
+        return f"{float(value) / 10000:.2f} 万元/吨"
+    except Exception:
+        return "N/A"
+
+
+def kpi_card(label, value, note=""):
+    st.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-label">{label}</div>
+            <div class="kpi-value">{value}</div>
+            <div class="kpi-note">{note}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def compact_metric_card(label, value, note=""):
+    st.markdown(
+        f"""
+        <div class="compact-card">
+            <div class="compact-label">{label}</div>
+            <div class="compact-value">{value}</div>
+            <div class="compact-note">{note}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def section_header(number, title):
+    st.markdown(
+        f"""
+        <div class="section-title">{number}　{title}</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def section_open():
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+
+
+def section_close():
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def plotly_enterprise_layout(fig, title=None, height=None):
+    layout_args = {
+        "plot_bgcolor": "white",
+        "paper_bgcolor": "white",
+        "font": dict(color=TEXT_DARK, size=13),
+        "legend": dict(font=dict(color=TEXT_DARK)),
+        "margin": dict(l=10, r=10, t=60, b=10),
+    }
+
+    if title:
+        layout_args["title"] = title
+        layout_args["title_font"] = dict(color=CATL_BLUE, size=22)
+
+    if height:
+        layout_args["height"] = height
+
+    fig.update_layout(**layout_args)
+    fig.update_xaxes(
+        gridcolor="#E5E7EB",
+        color=TEXT_DARK,
+        title_font=dict(color=TEXT_DARK),
+    )
+    fig.update_yaxes(
+        gridcolor="#E5E7EB",
+        color=TEXT_DARK,
+        title_font=dict(color=TEXT_DARK),
+    )
+    return fig
+
+
+def get_latest_price_forecast(price_forecast_df):
+    if price_forecast_df.empty:
+        return {}
+
+    row = price_forecast_df.iloc[0]
+
+    return {
+        "updated_at": row.get("updated_at", ""),
+        "model_version": row.get("model_version", ""),
+        "expected_lce_price": get_float(row, "expected_lce_price"),
+        "lower_bound": get_float(row, "lower_bound"),
+        "upper_bound": get_float(row, "upper_bound"),
+        "base_forecast_price": get_float(row, "base_forecast_price"),
+        "calibrated_aisc_90": get_float(row, "calibrated_aisc_90"),
+        "system_aisc_90": get_float(row, "system_aisc_90"),
+        "paper_base_lce_price": get_float(row, "paper_base_lce_price", 182000),
+        "paper_price_lower": get_float(row, "paper_price_lower", 170000),
+        "paper_price_upper": get_float(row, "paper_price_upper", 195000),
+        "gfex_futures_price": get_float(row, "gfex_futures_price"),
+        "crude_oil_price": get_float(row, "crude_oil_price"),
+        "sc6_price_index_usd_per_tonne": get_float(row, "sc6_price_index_usd_per_tonne"),
+        "sc6_price_index": get_float(row, "sc6_price_index"),
+        "usd_cny": get_float(row, "usd_cny"),
+        "sc6_to_lce_conversion": get_float(row, "sc6_to_lce_conversion"),
+        "sc6_pass_through": get_float(row, "sc6_pass_through"),
+        "base_sc6_lce_cost": get_float(row, "base_sc6_lce_cost"),
+        "current_sc6_lce_cost": get_float(row, "current_sc6_lce_cost"),
+        "sc6_lce_cost_change": get_float(row, "sc6_lce_cost_change"),
+        "sc6_adjustment": get_float(row, "sc6_adjustment"),
+        "cathode_utilization": get_float(row, "cathode_utilization"),
+        "inventory_days": get_float(row, "inventory_days"),
+        "supply_loss_ratio": get_float(row, "supply_loss_ratio"),
+        "aisc_uplift": get_float(row, "aisc_uplift"),
+        "gfex_adjustment": get_float(row, "gfex_adjustment"),
+        "inventory_adjustment": get_float(row, "inventory_adjustment"),
+        "utilization_adjustment": get_float(row, "utilization_adjustment"),
+        "aisc_adjustment": get_float(row, "aisc_adjustment"),
+        "policy_supply_premium": get_float(row, "policy_supply_premium"),
+        "policy_aisc_premium": get_float(row, "policy_aisc_premium"),
+        "price_zone": row.get("price_zone", ""),
+        "producer_strategy": row.get("producer_strategy", ""),
+        "data_quality_note": row.get("data_quality_note", ""),
+    }
+
+
+# =========================
+# 主程序
+# =========================
+
+def main():
+    cost_df = load_csv("dynamic_cost_curve.csv")
+    invest_df = load_csv("investment_recommendations.csv")
+    event_risk_df = load_csv("country_event_risk.csv")
+    policy_price_df = load_csv("policy_price_impact.csv")
+    price_forecast_df = load_csv("lce_price_forecast.csv")
+    price_timeseries_df = load_csv("lce_price_timeseries.csv")
+    weekly_inputs_df = load_csv("weekly_price_inputs.csv")
+    supply_demand_df = load_csv("lce_supply_demand_forecast.csv")
+    if cost_df.empty or invest_df.empty:
+        st.warning("没有找到核心报告数据。请先运行：python weekly_update.py")
+        return
+
+    forecast = get_latest_price_forecast(price_forecast_df)
+
+    expected_price = forecast.get("expected_lce_price", 0)
+    lower_bound = forecast.get("lower_bound", 0)
+    upper_bound = forecast.get("upper_bound", 0)
+    aisc_90 = forecast.get("calibrated_aisc_90", 0)
+
+    if aisc_90 <= 0:
+        aisc_90 = forecast.get("system_aisc_90", 0)
+
+    # =========================
+    # 顶部标题
+    # =========================
+
+    top_left, top_right = st.columns([4, 1])
+
+    with top_left:
+        st.markdown(
+            """
+            <div class="main-title">全球锂资源智能决策驾驶舱</div>
+            <div class="sub-title">
+            Global Lithium Resource Intelligence Dashboard ｜ 以数据驱动全球锂资源配置，支持长期资源安全、低成本与可持续竞争力
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with top_right:
+        st.markdown(
+            """
+            <div class="catl-logo">CATL 宁德时代</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # =========================
+    # 侧边栏筛选
+    # =========================
+
+    st.sidebar.header("筛选条件")
+
+    if "country" in invest_df.columns:
+        countries = sorted(invest_df["country"].dropna().unique().tolist())
+    else:
+        countries = []
+
+    selected_countries = st.sidebar.multiselect(
+        "选择国家",
+        countries,
+        default=countries,
+    )
+
+    if selected_countries and "country" in invest_df.columns:
+        filtered_invest_df = invest_df[invest_df["country"].isin(selected_countries)].copy()
+    else:
+        filtered_invest_df = invest_df.copy()
+
+    st.sidebar.markdown("---")
+    st.sidebar.write("运行建议：")
+    st.sidebar.code("python weekly_update.py\nstreamlit run dashboard.py")
+    st.sidebar.markdown("---")
+    st.sidebar.write("模型输出：")
+    st.sidebar.write("- LCE价格预测")
+    st.sidebar.write("- 全球矿山地图")
+    st.sidebar.write("- AISC成本曲线")
+    st.sidebar.write("- 投资优先级")
+    st.sidebar.write("- AI按需策略")
+
+    # =========================
+    # 01 核心结论区
+    # =========================
+
+    section_header("01", "核心结论区")
+    section_open()
+
+    high_priority_count = 0
+    if "investment_score" in filtered_invest_df.columns:
+        investment_score_series = pd.to_numeric(
+            filtered_invest_df["investment_score"],
+            errors="coerce",
+        )
+        high_priority_count = int((investment_score_series >= 0.70).sum())
+
+    high_risk_country_count = 0
+    if not event_risk_df.empty and "event_risk_score" in event_risk_df.columns:
+        event_scores = pd.to_numeric(event_risk_df["event_risk_score"], errors="coerce")
+        high_risk_country_count = int((event_scores >= 0.70).sum())
+    elif "risk_score" in filtered_invest_df.columns and "country" in filtered_invest_df.columns:
+        risk_country = (
+            filtered_invest_df
+            .assign(risk_score_num=pd.to_numeric(filtered_invest_df["risk_score"], errors="coerce"))
+            .groupby("country")["risk_score_num"]
+            .max()
+        )
+        high_risk_country_count = int((risk_country >= 0.70).sum())
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+
+    with c1:
+        kpi_card(
+            "预测LCE价格中枢",
+            format_wan(expected_price) if expected_price > 0 else "N/A",
+            "未来6个月价格模型中枢",
+        )
+
+    with c2:
+        if lower_bound > 0 and upper_bound > 0:
+            value = f"{lower_bound / 10000:.2f} - {upper_bound / 10000:.2f}"
+        else:
+            value = "N/A"
+
+        kpi_card(
+            "未来6个月区间",
+            value,
+            "万元/吨，模型预测上下沿",
+        )
+
+    with c3:
+        kpi_card(
+            "90% AISC成本线",
+            format_wan(aisc_90) if aisc_90 > 0 else "N/A",
+            "边际成本防御参考线",
+        )
+
+    with c4:
+        kpi_card(
+            "高优先级项目",
+            f"{high_priority_count} 个",
+            "投资评分 ≥ 0.70",
+        )
+
+    with c5:
+        kpi_card(
+            "高风险国家",
+            f"{high_risk_country_count} 个",
+            "事件或综合风险偏高",
+        )
+
+    section_close()
+
+       # =========================
+    # 02 LCE价格预测与生产者策略
+    # =========================
+
+    section_header("02", "LCE价格预测与生产者策略")
+    section_open()
+
+    if price_forecast_df.empty:
+        st.warning("暂无 lce_price_forecast.csv。请先运行：python weekly_update.py")
+    else:
+        updated_at = forecast.get("updated_at", "")
+        price_zone = forecast.get("price_zone", "")
+        producer_strategy = forecast.get("producer_strategy", "")
+
+        if expected_price > 0 and lower_bound > 0 and upper_bound > 0:
+            insight_text = (
+                f"未来6个月LCE价格预计运行在 "
+                f"<b>{lower_bound / 10000:.2f}–{upper_bound / 10000:.2f} 万元/吨</b> 区间，"
+                f"中枢约 <b>{expected_price / 10000:.2f} 万元/吨</b>。"
+                f"当前模型阶段判断为：<b>{price_zone}</b>。"
+            )
+        else:
+            insight_text = "当前价格预测数据不完整，请先运行 weekly_update.py。"
+
+        st.markdown(
+            f"""
+            <div class="insight-box">
+            <b>管理层摘要：</b>{insight_text}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.caption(
+            f"最近更新时间：{updated_at if updated_at else 'N/A'} ｜ "
+            f"模型版本：{forecast.get('model_version', 'N/A')}"
+        )
+
+        chart_col, strategy_col = st.columns([2.2, 1])
+
+        with chart_col:
+            st.markdown("#### 过去半年价格走势与未来半年预测")
+
+            if price_timeseries_df.empty:
+                st.info("暂无 lce_price_timeseries.csv。请先运行：python price_timeseries.py")
+            else:
+                ts_df = price_timeseries_df.copy()
+                ts_df["date"] = pd.to_datetime(ts_df["date"], errors="coerce")
+                ts_df = ts_df.dropna(subset=["date"]).copy()
+
+                for col in [
+                    "actual_lce_price",
+                    "forecast_center",
+                    "forecast_lower",
+                    "forecast_upper",
+                ]:
+                    if col in ts_df.columns:
+                        ts_df[col] = pd.to_numeric(
+                            ts_df[col],
+                            errors="coerce"
+                        ) / 10000
+
+                fig_ts = go.Figure()
+
+                # 预测区间阴影：先画上沿，再画下沿形成填充区
+                if "forecast_upper" in ts_df.columns:
+                    fig_ts.add_trace(
+                        go.Scatter(
+                            x=ts_df["date"],
+                            y=ts_df["forecast_upper"],
+                            mode="lines",
+                            name="预测上沿",
+                            line=dict(
+                                color="rgba(37, 99, 235, 0.25)",
+                                width=1,
+                            ),
+                            hovertemplate=
+                                "日期：%{x|%Y-%m-%d}<br>"
+                                "预测上沿：%{y:.2f} 万元/吨"
+                                "<extra></extra>",
+                        )
+                    )
+
+                if "forecast_lower" in ts_df.columns:
+                    fig_ts.add_trace(
+                        go.Scatter(
+                            x=ts_df["date"],
+                            y=ts_df["forecast_lower"],
+                            mode="lines",
+                            name="预测下沿",
+                            line=dict(
+                                color="rgba(37, 99, 235, 0.25)",
+                                width=1,
+                            ),
+                            fill="tonexty",
+                            fillcolor="rgba(37, 99, 235, 0.14)",
+                            hovertemplate=
+                                "日期：%{x|%Y-%m-%d}<br>"
+                                "预测下沿：%{y:.2f} 万元/吨"
+                                "<extra></extra>",
+                        )
+                    )
+
+                # 历史价格
+                if "actual_lce_price" in ts_df.columns:
+                    fig_ts.add_trace(
+                        go.Scatter(
+                            x=ts_df["date"],
+                            y=ts_df["actual_lce_price"],
+                            mode="lines+markers",
+                            name="历史LCE价格",
+                            line=dict(
+                                color=CATL_BLUE,
+                                width=4,
+                            ),
+                            marker=dict(
+                                size=7,
+                                color=CATL_BLUE,
+                            ),
+                            hovertemplate=
+                                "日期：%{x|%Y-%m-%d}<br>"
+                                "历史价格：%{y:.2f} 万元/吨"
+                                "<extra></extra>",
+                        )
+                    )
+
+                # 预测中枢
+                if "forecast_center" in ts_df.columns:
+                    fig_ts.add_trace(
+                        go.Scatter(
+                            x=ts_df["date"],
+                            y=ts_df["forecast_center"],
+                            mode="lines+markers",
+                            name="未来预测中枢",
+                            line=dict(
+                                color="#2563EB",
+                                width=4,
+                                dash="dash",
+                            ),
+                            marker=dict(
+                                size=7,
+                                color="#2563EB",
+                            ),
+                            hovertemplate=
+                                "日期：%{x|%Y-%m-%d}<br>"
+                                "预测中枢：%{y:.2f} 万元/吨"
+                                "<extra></extra>",
+                        )
+                    )
+
+                # 参考线数值
+                paper_base = forecast.get("paper_base_lce_price", 182000) / 10000
+                paper_lower = forecast.get("paper_price_lower", 170000) / 10000
+                aisc_90_wan = aisc_90 / 10000 if aisc_90 > 0 else 0
+
+                if aisc_90_wan > 0:
+                    fig_ts.add_hline(
+                        y=aisc_90_wan,
+                        line_dash="dash",
+                        line_color=ORANGE,
+                        line_width=2,
+                    )
+
+                if paper_base > 0:
+                    fig_ts.add_hline(
+                        y=paper_base,
+                        line_dash="dot",
+                        line_color="#475569",
+                        line_width=2,
+                    )
+
+                if paper_lower > 0:
+                    fig_ts.add_hline(
+                        y=paper_lower,
+                        line_dash="dot",
+                        line_color=RED,
+                        line_width=2,
+                    )
+
+                # 右侧标注，避免文字重叠
+                if not ts_df.empty:
+                    max_date = ts_df["date"].max()
+
+                    if aisc_90_wan > 0:
+                        fig_ts.add_annotation(
+                            x=max_date,
+                            y=aisc_90_wan,
+                            text=f"90% AISC：{aisc_90_wan:.2f}",
+                            showarrow=False,
+                            xanchor="left",
+                            yanchor="bottom",
+                            font=dict(
+                                color=ORANGE,
+                                size=13,
+                            ),
+                            bgcolor="rgba(255,255,255,0.85)",
+                        )
+
+                    if paper_base > 0:
+                        fig_ts.add_annotation(
+                            x=max_date,
+                            y=paper_base,
+                            text=f"论文中枢：{paper_base:.2f}",
+                            showarrow=False,
+                            xanchor="left",
+                            yanchor="top",
+                            font=dict(
+                                color="#475569",
+                                size=13,
+                            ),
+                            bgcolor="rgba(255,255,255,0.85)",
+                        )
+
+                    if paper_lower > 0:
+                        fig_ts.add_annotation(
+                            x=max_date,
+                            y=paper_lower,
+                            text=f"成本铁底：{paper_lower:.2f}",
+                            showarrow=False,
+                            xanchor="left",
+                            yanchor="top",
+                            font=dict(
+                                color=RED,
+                                size=13,
+                            ),
+                            bgcolor="rgba(255,255,255,0.85)",
+                        )
+
+                # 自动计算更合理的Y轴范围，不再从0开始
+                y_values = []
+
+                for col in [
+                    "actual_lce_price",
+                    "forecast_center",
+                    "forecast_lower",
+                    "forecast_upper",
+                ]:
+                    if col in ts_df.columns:
+                        y_values.extend(ts_df[col].dropna().tolist())
+
+                if aisc_90_wan > 0:
+                    y_values.append(aisc_90_wan)
+
+                if paper_base > 0:
+                    y_values.append(paper_base)
+
+                if paper_lower > 0:
+                    y_values.append(paper_lower)
+
+                if y_values:
+                    y_min = min(y_values)
+                    y_max = max(y_values)
+                    y_padding = max((y_max - y_min) * 0.25, 0.8)
+                    y_range = [
+                        max(0, y_min - y_padding),
+                        y_max + y_padding,
+                    ]
+                else:
+                    y_range = [16, 21]
+
+                fig_ts.update_layout(
+                    title=dict(
+                        text="过去半年LCE价格走势与未来半年预测区间",
+                        font=dict(
+                            color=CATL_BLUE,
+                            size=22,
+                        ),
+                    ),
+                    xaxis_title="日期",
+                    yaxis_title="LCE价格（万元/吨）",
+                    height=520,
+                    hovermode="x unified",
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.04,
+                        xanchor="left",
+                        x=0,
+                        font=dict(
+                            color=TEXT_DARK,
+                            size=12,
+                        ),
+                        bgcolor="rgba(255,255,255,0.85)",
+                    ),
+                    plot_bgcolor="white",
+                    paper_bgcolor="white",
+                    margin=dict(
+                        l=20,
+                        r=90,
+                        t=90,
+                        b=40,
+                    ),
+                    font=dict(
+                        color=TEXT_DARK,
+                        size=13,
+                    ),
+                )
+
+                fig_ts.update_xaxes(
+                    showgrid=True,
+                    gridcolor="#E5E7EB",
+                    zeroline=False,
+                    color=TEXT_DARK,
+                    title_font=dict(
+                        color=TEXT_DARK,
+                        size=14,
+                    ),
+                    tickfont=dict(
+                        color=TEXT_DARK,
+                        size=12,
+                    ),
+                )
+
+                fig_ts.update_yaxes(
+                    range=y_range,
+                    showgrid=True,
+                    gridcolor="#E5E7EB",
+                    zeroline=False,
+                    color=TEXT_DARK,
+                    title_font=dict(
+                        color=TEXT_DARK,
+                        size=14,
+                    ),
+                    tickfont=dict(
+                        color=TEXT_DARK,
+                        size=12,
+                    ),
+                )
+
+                st.plotly_chart(fig_ts, use_container_width=True)
+
+        with strategy_col:
+            st.markdown("#### 价格区间判断")
+            st.markdown(
+                f"""
+                <div class="strategy-box">
+                <b>{price_zone if price_zone else "暂无判断"}</b>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            st.markdown("#### 生产者策略建议")
+            st.markdown(
+                f"""
+                <div class="strategy-box">
+                {producer_strategy if producer_strategy else "暂无生产者策略建议。"}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            st.markdown("#### 核心输入")
+
+            input_m1, input_m2 = st.columns(2)
+
+            with input_m1:
+                compact_metric_card(
+                    "GFEX期货价格",
+                    format_wan(forecast.get("gfex_futures_price", 0)),
+                    "元/吨LCE口径",
+                )
+
+            with input_m2:
+                sc6_price = forecast.get("sc6_price_index_usd_per_tonne", 0)
+                if sc6_price <= 0:
+                    sc6_price = forecast.get("sc6_price_index", 0)
+
+                compact_metric_card(
+                    "SC6价格",
+                    f"{sc6_price:.0f} 美元/吨",
+                    "锂精矿价格",
+                )
+
+            input_m3, input_m4 = st.columns(2)
+
+            with input_m3:
+                compact_metric_card(
+                    "库存天数",
+                    f"{forecast.get('inventory_days', 0):.1f} 天",
+                    "下游库存周转",
+                )
+
+            with input_m4:
+                compact_metric_card(
+                    "正极开工率",
+                    f"{forecast.get('cathode_utilization', 0):.1%}",
+                    "需求侧强度",
+                )
+
+        st.markdown("#### SC6单位转换与成本传导")
+
+        sc6_c1, sc6_c2, sc6_c3, sc6_c4 = st.columns(4)
+
+        with sc6_c1:
+            compact_metric_card(
+                "SC6折算LCE成本",
+                format_wan(forecast.get("current_sc6_lce_cost", 0)),
+                "当前SC6 × 汇率 × 单耗",
+            )
+
+        with sc6_c2:
+            compact_metric_card(
+                "基准SC6折算成本",
+                format_wan(forecast.get("base_sc6_lce_cost", 0)),
+                "论文基准SC6口径",
+            )
+
+        with sc6_c3:
+            compact_metric_card(
+                "SC6成本变化",
+                format_wan(forecast.get("sc6_lce_cost_change", 0)),
+                "相对基准变化",
+            )
+
+        with sc6_c4:
+            compact_metric_card(
+                "SC6价格传导修正",
+                format_wan(forecast.get("sc6_adjustment", 0)),
+                "变化 × 传导系数",
+            )
+
+        with st.expander("查看价格预测明细数据"):
+            st.dataframe(price_forecast_df, use_container_width=True)
+
+    section_close()
+        # =========================
+    # 03 未来LCE供需缺口预测
+    # =========================
+
+    section_header("03", "未来LCE供需缺口预测")
+    section_open()
+
+    if supply_demand_df.empty:
+        st.warning("暂无 lce_supply_demand_forecast.csv。请先运行：python supply_demand_forecast.py")
+    else:
+        sd_df = supply_demand_df.copy()
+
+        numeric_cols = [
+            "adjusted_demand_lce",
+            "effective_supply_lce",
+            "balance_lce",
+            "gap_ratio",
+            "base_demand_lce",
+            "ess_uplift_lce",
+            "inventory_restocking_lce",
+            "announced_supply_lce",
+            "policy_disruption_lce",
+            "logistics_delay_lce",
+        ]
+
+        for col in numeric_cols:
+            if col in sd_df.columns:
+                sd_df[col] = pd.to_numeric(sd_df[col], errors="coerce")
+
+        def get_period_row(period_name):
+            matched = sd_df[sd_df["period"] == period_name]
+            if matched.empty:
+                return None
+            return matched.iloc[0]
+
+        row_6m = get_period_row("未来6个月")
+        row_12m = get_period_row("未来12个月")
+        row_2030 = get_period_row("2030")
+
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1:
+            if row_6m is not None:
+                compact_metric_card(
+                    "未来6个月平衡",
+                    f"{row_6m['balance_lce']:.1f} 万吨",
+                    row_6m.get("market_status", "")
+                )
+            else:
+                compact_metric_card("未来6个月平衡", "N/A", "")
+
+        with c2:
+            if row_12m is not None:
+                compact_metric_card(
+                    "未来12个月平衡",
+                    f"{row_12m['balance_lce']:.1f} 万吨",
+                    row_12m.get("market_status", "")
+                )
+            else:
+                compact_metric_card("未来12个月平衡", "N/A", "")
+
+        with c3:
+            if row_2030 is not None:
+                compact_metric_card(
+                    "2030结构性平衡",
+                    f"{row_2030['balance_lce']:.1f} 万吨",
+                    row_2030.get("market_status", "")
+                )
+            else:
+                compact_metric_card("2030结构性平衡", "N/A", "")
+
+        with c4:
+            shortage_count = int((sd_df["balance_lce"] < 0).sum()) if "balance_lce" in sd_df.columns else 0
+            compact_metric_card(
+                "短缺周期数量",
+                f"{shortage_count} 个",
+                "balance_lce < 0"
+            )
+
+        st.markdown(
+            """
+            <div class="insight-box">
+            <b>模型解释：</b>
+            本模块使用“论文锚定 + 中长期情景预测”的供需平衡表模型。
+            其中 2026 年为论文锚定预测，未来6个月和未来12个月分别对应半年度与年度口径；
+            2027-2030年为基于项目兑现率、运营率、政策扰动和物流时滞的情景预测。
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # =========================
+        # 合并图：需求 / 供应 / 缺口
+        # =========================
+
+                # =========================
+        # 合并图：需求 / 供应 / 缺口
+        # 图表展示口径：
+        # balance_lce = effective_supply_lce - adjusted_demand_lce
+        # display_gap_lce = -balance_lce
+        # 因此缺口越大，曲线越向上
+        # =========================
+
+        st.markdown("#### LCE年度需求、可兑现供应与供需缺口预测")
+
+        chart_df = sd_df.copy()
+
+        # 横坐标：保留 6M、12M/2026、2027、2028、2029、2030
+        if "period" in chart_df.columns:
+            chart_df["x_label"] = chart_df["period"].astype(str)
+            chart_df.loc[chart_df["period"] == "未来6个月", "x_label"] = "6M"
+            chart_df.loc[chart_df["period"] == "未来12个月", "x_label"] = "12M / 2026"
+        elif "year" in chart_df.columns:
+            chart_df["x_label"] = chart_df["year"].astype(str)
+        else:
+            chart_df["x_label"] = chart_df.index.astype(str)
+
+        order_map = {
+            "6M": 0,
+            "12M / 2026": 1,
+            "2027": 2,
+            "2028": 3,
+            "2029": 4,
+            "2030": 5,
+        }
+
+        chart_df["sort_order"] = chart_df["x_label"].map(order_map).fillna(99)
+        chart_df = chart_df.sort_values("sort_order").reset_index(drop=True)
+
+        # 展示用缺口：
+        # balance_lce 为负数代表短缺；
+        # display_gap_lce 转成正数，便于图上显示“缺口越大越高”
+        chart_df["display_gap_lce"] = -chart_df["balance_lce"]
+
+        def gap_color(value):
+            try:
+                value = float(value)
+            except Exception:
+                value = 0
+
+            if value <= 0:
+                return "#16A34A"   # 过剩
+            if value <= 5:
+                return "#FACC15"   # 基本平衡
+            if value <= 15:
+                return "#F59E0B"   # 轻度短缺
+            return "#DC2626"       # 显著短缺
+
+        chart_df["gap_color"] = chart_df["display_gap_lce"].apply(gap_color)
+
+        fig_balance = go.Figure()
+
+        # 调整后需求柱
+        fig_balance.add_trace(
+            go.Bar(
+                x=chart_df["x_label"],
+                y=chart_df["adjusted_demand_lce"],
+                name="调整后需求",
+                marker=dict(color=CATL_BLUE),
+                offsetgroup="demand",
+                hovertemplate=
+                    "周期：%{x}<br>"
+                    "调整后需求：%{y:.1f} 万吨LCE"
+                    "<extra></extra>",
+            )
+        )
+
+        # 可兑现供应柱
+        fig_balance.add_trace(
+            go.Bar(
+                x=chart_df["x_label"],
+                y=chart_df["effective_supply_lce"],
+                name="可兑现供应",
+                marker=dict(color="#16A34A"),
+                offsetgroup="supply",
+                hovertemplate=
+                    "周期：%{x}<br>"
+                    "可兑现供应：%{y:.1f} 万吨LCE"
+                    "<extra></extra>",
+            )
+        )
+
+        # 缺口曲线：使用 display_gap_lce，缺口越大越向上
+        fig_balance.add_trace(
+            go.Scatter(
+                x=chart_df["x_label"],
+                y=chart_df["display_gap_lce"],
+                name="LCE缺口强度",
+                mode="lines+markers+text",
+                yaxis="y2",
+                line=dict(
+                    color="#DC2626",
+                    width=4,
+                    dash="dot",
+                ),
+                marker=dict(
+                    size=11,
+                    color=chart_df["gap_color"],
+                    line=dict(
+                        color="#FFFFFF",
+                        width=1.5,
+                    ),
+                ),
+                text=[f"{v:.1f}" for v in chart_df["display_gap_lce"]],
+                textposition="top center",
+                hovertemplate=
+                    "周期：%{x}<br>"
+                    "缺口强度：%{y:.1f} 万吨LCE<br>"
+                    "数值越高，代表缺口越大"
+                    "<extra></extra>",
+            )
+        )
+
+        # 右轴0线
+        fig_balance.add_hline(
+            y=0,
+            line_dash="dash",
+            line_color="#64748B",
+            line_width=2,
+            annotation_text="无缺口线",
+            annotation_position="bottom left",
+            annotation_font_color=TEXT_DARK,
+            yref="y2",
+        )
+
+        # 右轴范围：从0开始，缺口越大越高
+        gap_max = float(chart_df["display_gap_lce"].max())
+        y2_max = max(gap_max * 1.25, 10)
+
+        fig_balance.update_layout(
+            title=dict(
+                text="LCE年度需求、可兑现供应与供需缺口预测",
+                font=dict(
+                    color=CATL_BLUE,
+                    size=22,
+                ),
+            ),
+            xaxis=dict(
+                title="年份 / 周期",
+                tickfont=dict(
+                    color=TEXT_DARK,
+                    size=13,
+                ),
+                title_font=dict(
+                    color=TEXT_DARK,
+                    size=14,
+                ),
+                showgrid=False,
+            ),
+            yaxis=dict(
+                title="需求 / 供应（万吨LCE）",
+                tickfont=dict(
+                    color=TEXT_DARK,
+                    size=13,
+                ),
+                title_font=dict(
+                    color=TEXT_DARK,
+                    size=14,
+                ),
+                gridcolor="#E5E7EB",
+                zeroline=False,
+            ),
+            yaxis2=dict(
+                title="缺口强度（万吨LCE，越高=缺口越大）",
+                overlaying="y",
+                side="right",
+                range=[0, y2_max],
+                tickfont=dict(
+                    color="#DC2626",
+                    size=13,
+                ),
+                title_font=dict(
+                    color="#DC2626",
+                    size=14,
+                ),
+                zeroline=True,
+                zerolinecolor="#64748B",
+                zerolinewidth=2,
+            ),
+            barmode="group",
+            height=540,
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            hovermode="x unified",
+            font=dict(
+                color=TEXT_DARK,
+                size=13,
+            ),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.08,
+                xanchor="left",
+                x=0,
+                font=dict(
+                    color=TEXT_DARK,
+                    size=13,
+                ),
+                bgcolor="rgba(255,255,255,0.92)",
+                bordercolor="#D9E2F2",
+                borderwidth=1,
+            ),
+            margin=dict(
+                l=30,
+                r=95,
+                t=100,
+                b=70,
+            ),
+        )
+
+        st.plotly_chart(fig_balance, use_container_width=True)
+
+        st.markdown(
+            """
+            <div class="insight-box">
+            <b>图表解读：</b>
+            蓝色柱代表调整后LCE需求，绿色柱代表可兑现供应；
+            红色虚线为缺口强度，数值越高代表缺口越大。
+            后台计算仍保留 balance_lce = effective_supply_lce - adjusted_demand_lce；
+            图表展示时将缺口转换为正数显示，便于管理层直观看到缺口逐年扩大。
+            其中 6M 与 12M/2026 为论文锚定口径，2027-2030 年为中长期情景预测。
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    section_close()
+
+      # =========================
+    # 04 全球锂矿资源分布图
+    # =========================
+
+    section_header("04", "全球锂矿资源分布图")
+    section_open()
+
+    map_df = cost_df.copy()
+
+    if not invest_df.empty and "name" in invest_df.columns and "country" in invest_df.columns:
+        invest_cols = [
+            col for col in [
+                "name",
+                "country",
+                "investment_score",
+                "risk_score",
+                "recommended_action",
+            ]
+            if col in invest_df.columns
+        ]
+
+        if "investment_score" in invest_cols:
+            map_df = map_df.merge(
+                invest_df[invest_cols],
+                on=["name", "country"],
+                how="left",
+                suffixes=("", "_invest"),
+            )
+
+    if "investment_score_invest" in map_df.columns:
+        if "investment_score" in map_df.columns:
+            map_df["investment_score"] = map_df["investment_score_invest"].fillna(
+                map_df["investment_score"]
+            )
+        else:
+            map_df["investment_score"] = map_df["investment_score_invest"].fillna(0.5)
+
+    if "risk_score_invest" in map_df.columns:
+        if "risk_score" in map_df.columns:
+            map_df["risk_score"] = map_df["risk_score_invest"].fillna(map_df["risk_score"])
+        else:
+            map_df["risk_score"] = map_df["risk_score_invest"].fillna(0.5)
+
+    if "latitude" not in map_df.columns or "longitude" not in map_df.columns:
+        st.warning("当前数据缺少 latitude / longitude 字段。请先运行 python geocode_missing_projects.py。")
+    else:
+        map_df["latitude"] = pd.to_numeric(map_df["latitude"], errors="coerce")
+        map_df["longitude"] = pd.to_numeric(map_df["longitude"], errors="coerce")
+        map_df = map_df.dropna(subset=["latitude", "longitude"]).copy()
+
+        if map_df.empty:
+            st.warning("没有可用于地图显示的项目。")
+        else:
+            for col, default in [
+                ("annual_capacity", 0),
+                ("investment_score", 0.5),
+                ("risk_score", 0.5),
+                ("aisc_cost", 0),
+                ("adjusted_aisc", 0),
+            ]:
+                if col not in map_df.columns:
+                    map_df[col] = default
+                map_df[col] = pd.to_numeric(map_df[col], errors="coerce").fillna(default)
+
+            if "status" not in map_df.columns:
+                map_df["status"] = "Unknown"
+
+            if "resource_type" not in map_df.columns:
+                map_df["resource_type"] = "Unknown"
+
+            if "recommended_action" not in map_df.columns:
+                map_df["recommended_action"] = "N/A"
+
+            # =========================
+            # PyDeck 数据准备
+            # =========================
+
+            def score_to_color(score):
+                try:
+                    score = float(score)
+                except Exception:
+                    score = 0.5
+
+                if score >= 0.70:
+                    return [22, 163, 74, 190]       # 绿色
+                if score >= 0.55:
+                    return [250, 204, 21, 190]      # 黄色
+                if score >= 0.40:
+                    return [245, 158, 11, 190]      # 橙色
+                return [220, 38, 38, 190]           # 红色
+
+            def risk_to_border_color(risk):
+                try:
+                    risk = float(risk)
+                except Exception:
+                    risk = 0.5
+
+                if risk >= 0.70:
+                    return [220, 38, 38, 255]
+                if risk >= 0.50:
+                    return [245, 158, 11, 255]
+                return [0, 58, 140, 255]
+
+            map_df["fill_color"] = map_df["investment_score"].apply(score_to_color)
+            map_df["line_color"] = map_df["risk_score"].apply(risk_to_border_color)
+
+            map_df["annual_capacity"] = pd.to_numeric(
+                map_df["annual_capacity"],
+                errors="coerce",
+            ).fillna(0)
+
+            max_capacity = map_df["annual_capacity"].max()
+
+            if max_capacity <= 0:
+                map_df["radius"] = 65000
+            else:
+                map_df["radius"] = (
+                    35000
+                    + (map_df["annual_capacity"] / max_capacity).clip(0, 1) * 95000
+                )
+
+            map_df["tooltip_text"] = (
+                "<b>" + map_df["name"].astype(str) + "</b><br/>"
+                + "国家：" + map_df["country"].astype(str) + "<br/>"
+                + "资源类型：" + map_df["resource_type"].astype(str) + "<br/>"
+                + "状态：" + map_df["status"].astype(str) + "<br/>"
+                + "年产能：" + map_df["annual_capacity"].round(0).astype(int).astype(str) + "<br/>"
+                + "调整后AISC：" + map_df["adjusted_aisc"].round(0).astype(int).astype(str) + "<br/>"
+                + "投资评分：" + map_df["investment_score"].round(2).astype(str) + "<br/>"
+                + "风险评分：" + map_df["risk_score"].round(2).astype(str)
+            )
+
+            # =========================
+            # 地图上方摘要
+            # =========================
+
+            total_projects = len(map_df)
+            high_score_projects = int((map_df["investment_score"] >= 0.70).sum())
+            high_risk_projects = int((map_df["risk_score"] >= 0.70).sum())
+
+            m1, m2, m3, m4 = st.columns(4)
+
+            with m1:
+                compact_metric_card(
+                    "地图项目数",
+                    f"{total_projects} 个",
+                    "具备经纬度的项目"
+                )
+
+            with m2:
+                compact_metric_card(
+                    "高评分项目",
+                    f"{high_score_projects} 个",
+                    "投资评分 ≥ 0.70"
+                )
+
+            with m3:
+                compact_metric_card(
+                    "高风险项目",
+                    f"{high_risk_projects} 个",
+                    "风险评分 ≥ 0.70"
+                )
+
+            with m4:
+                top_country = (
+                    map_df.groupby("country")["annual_capacity"]
+                    .sum()
+                    .sort_values(ascending=False)
+                    .index[0]
+                    if "country" in map_df.columns and not map_df.empty
+                    else "N/A"
+                )
+                compact_metric_card(
+                    "最大产能国家",
+                    str(top_country),
+                    "按项目年产能汇总"
+                )
+
+            st.markdown(
+                """
+                <div class="insight-box">
+                <b>地图判读：</b>
+                点位代表全球主要锂矿项目；圆点大小代表年产能；圆点颜色代表投资评分；
+                边框颜色代表风险水平。绿色为优先资源，橙红色为需谨慎评估区域。
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            # =========================
+            # PyDeck 图层
+            # =========================
+
+            midpoint_lat = float(map_df["latitude"].mean())
+            midpoint_lon = float(map_df["longitude"].mean())
+
+            view_state = pdk.ViewState(
+                latitude=midpoint_lat,
+                longitude=midpoint_lon,
+                zoom=1.1,
+                pitch=0,
+                bearing=0,
+            )
+
+            scatter_layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=map_df,
+                get_position="[longitude, latitude]",
+                get_radius="radius",
+                get_fill_color="fill_color",
+                get_line_color="line_color",
+                pickable=True,
+                stroked=True,
+                filled=True,
+                line_width_min_pixels=1.5,
+                radius_min_pixels=5,
+                radius_max_pixels=26,
+            )
+
+            text_layer = pdk.Layer(
+                "TextLayer",
+                data=map_df[map_df["investment_score"] >= 0.70].copy(),
+                get_position="[longitude, latitude]",
+                get_text="name",
+                get_size=12,
+                get_color=[0, 58, 140, 220],
+                get_angle=0,
+                get_text_anchor="middle",
+                get_alignment_baseline="bottom",
+                pickable=False,
+            )
+
+            deck = pdk.Deck(
+                map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                initial_view_state=view_state,
+                layers=[
+                    scatter_layer,
+                    text_layer,
+                ],
+                tooltip={
+                    "html": "{tooltip_text}",
+                    "style": {
+                        "backgroundColor": "white",
+                        "color": "#1F2937",
+                        "border": "1px solid #D9E2F2",
+                        "borderRadius": "8px",
+                        "padding": "10px",
+                        "fontSize": "13px",
+                    },
+                },
+            )
+
+            st.pydeck_chart(deck, use_container_width=True)
+
+            # =========================
+            # 地图图例
+            # =========================
+
+            st.markdown(
+                """
+                <div style="
+                    background-color:#FFFFFF;
+                    border:1px solid #D9E2F2;
+                    border-radius:10px;
+                    padding:12px 14px;
+                    margin-top:10px;
+                    font-size:13px;
+                    color:#1F2937;
+                ">
+                    <b>图例：</b>
+                    <span style="color:#16A34A;font-weight:800;">● 高投资评分</span>
+                    &nbsp;&nbsp;
+                    <span style="color:#FACC15;font-weight:800;">● 中等评分</span>
+                    &nbsp;&nbsp;
+                    <span style="color:#F59E0B;font-weight:800;">● 偏低评分</span>
+                    &nbsp;&nbsp;
+                    <span style="color:#DC2626;font-weight:800;">● 低评分/高风险</span>
+                    &nbsp;&nbsp;
+                    圆点越大代表年产能越高。
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            # =========================
+            # 右侧/下方资源集中度表
+            # =========================
+            with st.expander("查看地图项目明细"):
+                display_cols = [
+                    "name",
+                    "country",
+                    "resource_type",
+                    "status",
+                    "annual_capacity",
+                    "aisc_cost",
+                    "adjusted_aisc",
+                    "risk_score",
+                    "investment_score",
+                    "recommended_action",
+                ]
+
+                display_cols = [
+                    col for col in display_cols
+                    if col in map_df.columns
+                ]
+
+                map_display_df = map_df[display_cols].copy()
+
+                column_rename_map = {
+                    "name": "项目名称",
+                    "country": "国家",
+                    "resource_type": "资源类型",
+                    "status": "项目状态",
+                    "annual_capacity": "年产能",
+                    "aisc_cost": "基础AISC",
+                    "adjusted_aisc": "政策调整后AISC",
+                    "risk_score": "风险评分",
+                    "investment_score": "投资评分",
+                    "recommended_action": "建议动作",
+                }
+
+                map_display_df = map_display_df.rename(
+                    columns=column_rename_map
+                )
+
+                if "国家" in map_display_df.columns:
+                    country_map = {
+                        "Chile": "智利",
+                        "Argentina": "阿根廷",
+                        "Australia": "澳大利亚",
+                        "China": "中国",
+                        "United States": "美国",
+                        "Canada": "加拿大",
+                        "Brazil": "巴西",
+                        "Zimbabwe": "津巴布韦",
+                        "Mali": "马里",
+                        "Ghana": "加纳",
+                    }
+
+                    map_display_df["国家"] = map_display_df["国家"].replace(
+                        country_map
+                    )
+
+                if "资源类型" in map_display_df.columns:
+                    resource_type_map = {
+                        "brine": "盐湖",
+                        "spodumene": "锂辉石",
+                        "lepidolite": "锂云母",
+                        "clay": "锂粘土",
+                        "recycling": "回收",
+                        "Unknown": "未知",
+                    }
+
+                    map_display_df["资源类型"] = map_display_df["资源类型"].replace(
+                        resource_type_map
+                    )
+
+                if "项目状态" in map_display_df.columns:
+                    status_map = {
+                        "Operating": "在产",
+                        "Developing": "开发中",
+                        "Construction": "建设中",
+                        "Planned": "规划中",
+                        "Suspended": "暂停",
+                        "Unknown": "未知",
+                    }
+
+                    map_display_df["项目状态"] = map_display_df["项目状态"].replace(
+                        status_map
+                    )
+
+                if "建议动作" in map_display_df.columns:
+                    action_map = {
+                        "Prioritize investment": "优先投资",
+                        "Strategic offtake": "战略包销",
+                        "Monitor": "持续观察",
+                        "Avoid": "暂缓进入",
+                        "N/A": "暂无",
+                    }
+
+                    map_display_df["建议动作"] = map_display_df["建议动作"].replace(
+                        action_map
+                    )
+
+                for col in ["年产能", "基础AISC", "政策调整后AISC"]:
+                    if col in map_display_df.columns:
+                        map_display_df[col] = pd.to_numeric(
+                            map_display_df[col],
+                            errors="coerce",
+                        ).round(0)
+
+                for col in ["风险评分", "投资评分"]:
+                    if col in map_display_df.columns:
+                        map_display_df[col] = pd.to_numeric(
+                            map_display_df[col],
+                            errors="coerce",
+                        ).round(2)
+
+                if "投资评分" in map_display_df.columns:
+                    map_display_df = map_display_df.sort_values(
+                        "投资评分",
+                        ascending=False,
+                    )
+
+                st.dataframe(
+                    map_display_df,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+    section_close()
+
+    # =========================
+    # 05 全球AISC成本曲线
+    # =========================
+
+       # =========================
+    # 05全球AISC成本曲线
+    # =========================
+
+       # =========================
+    # 04 全球AISC成本曲线
+    # =========================
+
+    section_header("04", "全球AISC成本曲线")
+    section_open()
+
+    cost_chart_df = cost_df.copy()
+
+    # =========================
+    # 明确使用“政策调整后AISC”
+    # =========================
+    # 优先使用 adjusted_aisc。
+    # 如果没有 adjusted_aisc，才退回 realtime_aisc / aisc_cost。
+    # =========================
+
+    if "adjusted_aisc" in cost_chart_df.columns:
+        selected_aisc_col = "adjusted_aisc"
+        selected_aisc_name = "政策调整后AISC"
+        policy_curve_available = True
+    elif "realtime_aisc" in cost_chart_df.columns:
+        selected_aisc_col = "realtime_aisc"
+        selected_aisc_name = "动态AISC"
+        policy_curve_available = False
+    elif "aisc_cost" in cost_chart_df.columns:
+        selected_aisc_col = "aisc_cost"
+        selected_aisc_name = "基础AISC"
+        policy_curve_available = False
+    else:
+        selected_aisc_col = None
+        selected_aisc_name = None
+        policy_curve_available = False
+
+    if selected_aisc_col is None:
+        st.warning("dynamic_cost_curve.csv 中没有 adjusted_aisc / realtime_aisc / aisc_cost 字段。")
+    else:
+        cost_chart_df[selected_aisc_col] = pd.to_numeric(
+            cost_chart_df[selected_aisc_col],
+            errors="coerce",
+        )
+
+        cost_chart_df = cost_chart_df[
+            cost_chart_df[selected_aisc_col].notna()
+            & (cost_chart_df[selected_aisc_col] > 0)
+        ].copy()
+
+        if cost_chart_df.empty:
+            st.warning("没有可用于绘制 AISC 成本曲线的数据。请检查 adjusted_aisc 是否为空或为 0。")
+        else:
+            # 按政策调整后AISC从低到高排序，形成成本曲线
+            cost_chart_df = cost_chart_df.sort_values(
+                selected_aisc_col,
+                ascending=True,
+            ).reset_index(drop=True)
+
+            cost_chart_df["aisc_display_wan"] = cost_chart_df[selected_aisc_col] / 10000
+
+            # 补齐必要字段，避免 hover 报错
+            for col, default in [
+                ("country", "N/A"),
+                ("resource_type", "N/A"),
+                ("annual_capacity", 0),
+            ]:
+                if col not in cost_chart_df.columns:
+                    cost_chart_df[col] = default
+
+            cost_chart_df["annual_capacity"] = pd.to_numeric(
+                cost_chart_df["annual_capacity"],
+                errors="coerce",
+            ).fillna(0)
+
+            # =========================
+            # 成本分位数分层
+            # =========================
+
+            aisc_25 = cost_chart_df[selected_aisc_col].quantile(0.25)
+            aisc_50 = cost_chart_df[selected_aisc_col].quantile(0.50)
+            aisc_75 = cost_chart_df[selected_aisc_col].quantile(0.75)
+            aisc_90_curve = cost_chart_df[selected_aisc_col].quantile(0.90)
+
+            def classify_cost_level(value):
+                if value <= aisc_25:
+                    return "低成本"
+                if value <= aisc_50:
+                    return "中低成本"
+                if value <= aisc_75:
+                    return "中高成本"
+                if value <= aisc_90_curve:
+                    return "高成本"
+                return "边际高成本"
+
+            color_map = {
+                "低成本": "#16A34A",
+                "中低成本": "#84CC16",
+                "中高成本": "#FACC15",
+                "高成本": "#F59E0B",
+                "边际高成本": "#DC2626",
+            }
+
+            cost_chart_df["cost_level"] = cost_chart_df[selected_aisc_col].apply(
+                classify_cost_level
+            )
+
+            cost_chart_df["bar_color"] = cost_chart_df["cost_level"].map(
+                color_map
+            ).fillna("#64748B")
+
+            # 横轴显示短名，hover 保留全名
+            def shorten_name(x, max_len=14):
+                x = str(x)
+                if len(x) <= max_len:
+                    return x
+                return x[:max_len] + "…"
+
+            cost_chart_df["full_name"] = cost_chart_df["name"].astype(str)
+            cost_chart_df["display_name"] = cost_chart_df["full_name"].apply(shorten_name)
+
+            fig_cost = go.Figure()
+
+            # =========================
+            # 1）柱状图：政策调整后 AISC
+            # =========================
+
+            fig_cost.add_trace(
+                go.Bar(
+                    x=cost_chart_df["display_name"],
+                    y=cost_chart_df["aisc_display_wan"],
+                    name=f"{selected_aisc_name}柱状",
+                    marker=dict(
+                        color=cost_chart_df["bar_color"],
+                        line=dict(
+                            color="rgba(31, 41, 55, 0.25)",
+                            width=0.6,
+                        ),
+                    ),
+                    customdata=cost_chart_df[
+                        [
+                            "full_name",
+                            "country",
+                            "resource_type",
+                            "annual_capacity",
+                            "cost_level",
+                        ]
+                    ].values,
+                    hovertemplate=
+                        "<b>项目：</b>%{customdata[0]}<br>"
+                        "<b>国家：</b>%{customdata[1]}<br>"
+                        "<b>资源类型：</b>%{customdata[2]}<br>"
+                        "<b>年产能：</b>%{customdata[3]:,.0f}<br>"
+                        "<b>政策调整后AISC：</b>%{y:.2f} 万元/吨<br>"
+                        "<b>成本分层：</b>%{customdata[4]}<br>"
+                        "<extra></extra>",
+                )
+            )
+
+            # =========================
+            # 2）真正的“政策调整后AISC成本曲线”
+            # =========================
+            # 这条线明确使用 selected_aisc_col。
+            # 如果 selected_aisc_col = adjusted_aisc，则就是政策调整后曲线。
+            # =========================
+
+            fig_cost.add_trace(
+                go.Scatter(
+                    x=cost_chart_df["display_name"],
+                    y=cost_chart_df["aisc_display_wan"],
+                    mode="lines+markers",
+                    name=f"{selected_aisc_name}成本曲线",
+                    line=dict(
+                        color=CATL_BLUE,
+                        width=4,
+                        shape="linear",
+                    ),
+                    marker=dict(
+                        size=7,
+                        color=CATL_BLUE,
+                        line=dict(
+                            color="#FFFFFF",
+                            width=1.2,
+                        ),
+                    ),
+                    customdata=cost_chart_df[
+                        [
+                            "full_name",
+                            "country",
+                            "resource_type",
+                            "annual_capacity",
+                            "cost_level",
+                        ]
+                    ].values,
+                    hovertemplate=
+                        "<b>项目：</b>%{customdata[0]}<br>"
+                        "<b>国家：</b>%{customdata[1]}<br>"
+                        "<b>资源类型：</b>%{customdata[2]}<br>"
+                        "<b>年产能：</b>%{customdata[3]:,.0f}<br>"
+                        "<b>政策调整后AISC曲线值：</b>%{y:.2f} 万元/吨<br>"
+                        "<b>成本分层：</b>%{customdata[4]}<br>"
+                        "<extra></extra>",
+                )
+            )
+
+            # =========================
+            # 3）90% AISC成本线
+            # =========================
+
+            fig_cost.add_trace(
+                go.Scatter(
+                    x=cost_chart_df["display_name"],
+                    y=[aisc_90_curve / 10000] * len(cost_chart_df),
+                    mode="lines",
+                    name=f"90% AISC成本线 {aisc_90_curve / 10000:.2f}万",
+                    line=dict(
+                        color="#F59E0B",
+                        width=4,
+                        dash="dash",
+                    ),
+                    hoverinfo="skip",
+                )
+            )
+
+            # =========================
+            # 4）预测LCE价格中枢线
+            # =========================
+
+            forecast_lce_wan = expected_price / 10000 if expected_price > 0 else None
+            max_bar_wan = cost_chart_df["aisc_display_wan"].max()
+
+            show_forecast_line = (
+                forecast_lce_wan is not None
+                and forecast_lce_wan <= max_bar_wan * 1.6
+            )
+
+            if show_forecast_line:
+                fig_cost.add_trace(
+                    go.Scatter(
+                        x=cost_chart_df["display_name"],
+                        y=[forecast_lce_wan] * len(cost_chart_df),
+                        mode="lines",
+                        name=f"预测LCE价格中枢 {forecast_lce_wan:.2f}万",
+                        line=dict(
+                            color="#475569",
+                            width=3,
+                            dash="dot",
+                        ),
+                        hoverinfo="skip",
+                    )
+                )
+
+            # =========================
+            # 5）成本分层图例
+            # =========================
+
+            legend_items = [
+                ("低成本", "#16A34A"),
+                ("中低成本", "#84CC16"),
+                ("中高成本", "#FACC15"),
+                ("高成本", "#F59E0B"),
+                ("边际高成本", "#DC2626"),
+            ]
+
+            for label, color in legend_items:
+                fig_cost.add_trace(
+                    go.Scatter(
+                        x=[None],
+                        y=[None],
+                        mode="markers",
+                        name=label,
+                        marker=dict(
+                            size=12,
+                            color=color,
+                            symbol="square",
+                        ),
+                        hoverinfo="skip",
+                    )
+                )
+
+            # =========================
+            # 图表说明
+            # =========================
+
+            if not policy_curve_available:
+                st.warning(
+                    f"当前 dynamic_cost_curve.csv 中没有 adjusted_aisc 字段，"
+                    f"本图暂时使用 {selected_aisc_col} 绘制，严格意义上不是政策调整后AISC曲线。"
+                )
+
+            fig_cost.add_annotation(
+                xref="paper",
+                yref="paper",
+                x=0.99,
+                y=1.17,
+                showarrow=False,
+                align="right",
+                text=(
+                    "<b>判读逻辑：</b>"
+                    "蓝色折线=政策调整后AISC曲线；"
+                    "橙色虚线=90%成本线；"
+                    "柱状颜色=成本分层"
+                ),
+                font=dict(
+                    color=TEXT_DARK,
+                    size=13,
+                ),
+                bgcolor="rgba(255,255,255,0.92)",
+                bordercolor="#D9E2F2",
+                borderwidth=1,
+                borderpad=6,
+            )
+
+            fig_cost.update_layout(
+                title=dict(
+                    text="全球锂项目政策调整后AISC成本曲线与成本分层",
+                    font=dict(
+                        color=CATL_BLUE,
+                        size=22,
+                    ),
+                ),
+                xaxis_title="锂矿项目（按政策调整后AISC从低到高排序）",
+                yaxis_title="AISC（万元/吨）",
+                height=740,
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+                hovermode="x unified",
+                margin=dict(
+                    l=30,
+                    r=40,
+                    t=130,
+                    b=180,
+                ),
+                font=dict(
+                    color=TEXT_DARK,
+                    size=13,
+                ),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.06,
+                    xanchor="left",
+                    x=0,
+                    font=dict(
+                        color=TEXT_DARK,
+                        size=12,
+                    ),
+                    bgcolor="rgba(255,255,255,0.92)",
+                    bordercolor="#D1D5DB",
+                    borderwidth=1,
+                ),
+                bargap=0.18,
+            )
+
+            fig_cost.update_xaxes(
+                tickangle=-60,
+                tickfont=dict(
+                    color="#111827",
+                    size=13,
+                ),
+                title_font=dict(
+                    color="#111827",
+                    size=14,
+                ),
+                showgrid=False,
+                automargin=True,
+            )
+
+            fig_cost.update_yaxes(
+                tickfont=dict(
+                    color="#111827",
+                    size=13,
+                ),
+                title_font=dict(
+                    color="#111827",
+                    size=14,
+                ),
+                gridcolor="#E5E7EB",
+                zeroline=False,
+                rangemode="tozero",
+            )
+
+            st.plotly_chart(fig_cost, use_container_width=True)
+
+            # =========================
+            # 管理层摘要
+            # =========================
+
+            low_count = int((cost_chart_df["cost_level"] == "低成本").sum())
+            mid_low_count = int((cost_chart_df["cost_level"] == "中低成本").sum())
+            mid_high_count = int((cost_chart_df["cost_level"] == "中高成本").sum())
+            high_count = int((cost_chart_df["cost_level"] == "高成本").sum())
+            marginal_count = int((cost_chart_df["cost_level"] == "边际高成本").sum())
+
+            st.markdown("#### 政策调整后AISC成本曲线判读")
+
+            dz1, dz2, dz3, dz4, dz5 = st.columns(5)
+
+            with dz1:
+                compact_metric_card(
+                    "低成本",
+                    f"{low_count} 个",
+                    "最低25%项目",
+                )
+
+            with dz2:
+                compact_metric_card(
+                    "中低成本",
+                    f"{mid_low_count} 个",
+                    "25%-50%分位",
+                )
+
+            with dz3:
+                compact_metric_card(
+                    "中高成本",
+                    f"{mid_high_count} 个",
+                    "50%-75%分位",
+                )
+
+            with dz4:
+                compact_metric_card(
+                    "高成本",
+                    f"{high_count} 个",
+                    "75%-90%分位",
+                )
+
+            with dz5:
+                compact_metric_card(
+                    "边际高成本",
+                    f"{marginal_count} 个",
+                    "最高10%项目",
+                )
+
+            st.markdown(
+                """
+                <div class="insight-box">
+                <b>管理层解读：</b>
+                本图的蓝色折线为政策调整后AISC成本曲线，反映政策冲击、成本冲击或产能折减后的项目成本排序。
+                绿色项目代表政策调整后仍具备较强成本安全垫；
+                黄色项目需要结合资源质量、政策风险与加工条件综合判断；
+                橙色与红色项目属于高成本或边际高成本区域，应重点关注政策、物流、能源成本和价格下行风险。
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            with st.expander("查看政策调整后AISC成本明细"):
+                show_cols = [
+                    "name",
+                    "country",
+                    "resource_type",
+                    "annual_capacity",
+                    "aisc_cost",
+                    "realtime_aisc",
+                    "adjusted_aisc",
+                    "delivered_cost",
+                    "cost_level",
+                    "policy_supply_shock",
+                    "policy_cost_shock",
+                    "effective_capacity",
+                ]
+
+                show_cols = [
+                    col for col in show_cols
+                    if col in cost_chart_df.columns
+                ]
+
+                st.dataframe(
+                    cost_chart_df[show_cols],
+                    use_container_width=True,
+                )
+
+    section_close()
+
+    # =========================
+    # 06 政策冲击与新闻风险
+    # =========================
+
+    section_header("06", "政策冲击与新闻风险")
+    section_open()
+
+    if not policy_price_df.empty:
+        row = policy_price_df.iloc[0]
+        pc1, pc2, pc3, pc4, pc5 = st.columns(5)
+
+        with pc1:
+            st.metric("供给损失比例", f"{safe_num(row.get('supply_loss_ratio', 0)):.2%}")
+
+        with pc2:
+            st.metric("AISC上移", format_wan(row.get("aisc_uplift", 0)))
+
+        with pc3:
+            st.metric("供给溢价", format_wan(row.get("supply_premium", 0)))
+
+        with pc4:
+            st.metric("成本溢价", format_wan(row.get("aisc_premium", 0)))
+
+        with pc5:
+            st.metric("政策后价格影响", format_wan(row.get("expected_lce_price", 0)))
+    else:
+        st.info("暂无 policy_price_impact.csv。请先运行 python main.py。")
+
+    risk_left, risk_right = st.columns([1.2, 1])
+
+    with risk_left:
+        st.markdown("#### 国家新闻事件风险")
+
+        if not event_risk_df.empty:
+            if "country" in event_risk_df.columns and "event_risk_score" in event_risk_df.columns:
+                fig_event = px.bar(
+                    event_risk_df.sort_values("event_risk_score", ascending=False),
+                    x="country",
+                    y="event_risk_score",
+                    title="国家新闻事件风险评分",
+                    labels={"country": "国家", "event_risk_score": "事件风险评分"},
+                )
+
+                plotly_enterprise_layout(
+                    fig_event,
+                    title="国家新闻事件风险评分",
+                    height=360,
+                )
+
+                st.plotly_chart(fig_event, use_container_width=True)
+            else:
+                st.info("事件风险字段不足。")
+        else:
+            st.info("暂无国家新闻事件风险数据。")
+
+    with risk_right:
+        st.markdown("#### 风险明细")
+
+        if not event_risk_df.empty:
+            display_cols = [
+                col for col in [
+                    "country",
+                    "event_risk_score",
+                    "event_count",
+                    "negative_event_count",
+                    "latest_event_title",
+                ]
+                if col in event_risk_df.columns
+            ]
+
+            if display_cols:
+                if "event_risk_score" in event_risk_df.columns:
+                    display_df = event_risk_df[display_cols].sort_values(
+                        "event_risk_score",
+                        ascending=False,
+                    )
+                else:
+                    display_df = event_risk_df[display_cols]
+
+                st.dataframe(display_df, use_container_width=True)
+            else:
+                st.info("暂无可展示风险字段。")
+        else:
+            st.info("暂无风险明细。")
+
+    section_close()
+
+    # =========================
+    # 07 投资优先级清单
+    # =========================
+
+    section_header("07", "投资优先级清单")
+    section_open()
+
+    ranking_cols = [
+        "name",
+        "country",
+        "resource_type",
+        "adjusted_aisc",
+        "delivered_cost",
+        "risk_score",
+        "investment_score",
+        "recommended_action",
+    ]
+
+    ranking_cols = [col for col in ranking_cols if col in filtered_invest_df.columns]
+
+    if ranking_cols:
+        table_df = filtered_invest_df.copy()
+
+        if "investment_score" in table_df.columns:
+            table_df["investment_score"] = pd.to_numeric(table_df["investment_score"], errors="coerce")
+            table_df = table_df.sort_values("investment_score", ascending=False)
+
+        st.dataframe(table_df[ranking_cols].head(30), use_container_width=True)
+    else:
+        st.info("暂无可展示的投资优先级字段。")
+
+    section_close()
+
+    # =========================
+    # 08 单项目AI策略建议
+    # =========================
+
+    section_header("08", "单项目AI策略建议（按需生成）")
+    section_open()
+
+    st.markdown(
+        """
+        <div class="insight-box">
+        为保证看板加载速度，AI策略建议不在页面打开时批量生成。请选择具体项目后，点击按钮单独生成。
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if "name" not in filtered_invest_df.columns:
+        st.warning("investment_recommendations.csv 中没有 name 字段。")
+    else:
+        if "investment_score" in filtered_invest_df.columns:
+            strategy_projects = (
+                filtered_invest_df
+                .sort_values("investment_score", ascending=False)
+                ["name"]
+                .dropna()
+                .unique()
+                .tolist()
+            )
+        else:
+            strategy_projects = filtered_invest_df["name"].dropna().unique().tolist()
+
+        if not strategy_projects:
+            st.warning("当前筛选条件下没有可用项目。")
+        else:
+            selected_project = st.selectbox(
+                "选择项目查看 / 生成AI投资建议",
+                strategy_projects,
+            )
+
+            project_rows = filtered_invest_df[filtered_invest_df["name"] == selected_project].copy()
+
+            if "investment_score" in project_rows.columns:
+                project_rows["investment_score"] = pd.to_numeric(project_rows["investment_score"], errors="coerce")
+                project_row = project_rows.sort_values("investment_score", ascending=False).iloc[0]
+            else:
+                project_row = project_rows.iloc[0]
+
+            ai_c1, ai_c2, ai_c3, ai_c4 = st.columns(4)
+
+            with ai_c1:
+                st.metric("国家", project_row.get("country", "N/A"))
+
+            with ai_c2:
+                st.metric("资源类型", project_row.get("resource_type", "N/A"))
+
+            with ai_c3:
+                st.metric("投资评分", project_row.get("investment_score", "N/A"))
+
+            with ai_c4:
+                st.metric("综合风险", project_row.get("risk_score", "N/A"))
+
+            st.markdown("#### 系统建议动作")
+            st.info(project_row.get("recommended_action", "暂无建议动作"))
+
+            cache_key = f"ai_strategy_{selected_project}"
+
+            if st.button("生成该项目AI投资策略建议", type="primary"):
+                with st.spinner("AI正在生成该项目投资建议，请稍候..."):
+                    try:
+                        from ai_strategy import generate_ai_strategy
+
+                        price_center = expected_price
+                        if price_center <= 0:
+                            price_center = project_row.get("delivered_cost", 0)
+
+                        strategy = generate_ai_strategy(
+                            row=project_row,
+                            predicted_price_center=price_center,
+                            rule_action=project_row.get("recommended_action", ""),
+                        )
+
+                        st.session_state[cache_key] = strategy
+
+                    except Exception as exc:
+                        st.error(f"AI策略生成失败：{exc}")
+
+            if cache_key in st.session_state:
+                st.markdown("#### AI Strategy Detail")
+                st.success(st.session_state[cache_key])
+            else:
+                st.caption("尚未生成AI策略。点击上方按钮后，只会为当前项目调用一次AI。")
+
+    section_close()
+
+    # =========================
+    # 09数据与模型说明
+    # =========================
+
+    section_header("09", "数据与模型说明")
+    section_open()
+
+    with st.expander("查看数据与模型说明"):
+        st.markdown(
+            """
+            **数据链路：**
+
+            - PostgreSQL：矿山、成本、政策、事件数据
+            - NewsAPI：新闻事件风险
+            - weekly_price_inputs.csv：GFEX、SC6、库存、开工率等价格模型输入
+            - price_forecast.py：LCE价格预测模型
+            - price_timeseries.py：历史与未来价格序列生成
+            - investment_engine.py：投资评分与建议动作
+
+            **价格预测模型：**
+
+            - 以论文价格中枢 18.2 万元/吨为锚
+            - 结合 GFEX、SC6、库存、开工率、AISC90、政策冲击进行动态修正
+            - SC6 已完成单位统一：美元/吨精矿 → 元/吨LCE等价成本
+            """
+        )
+
+        if not weekly_inputs_df.empty:
+            st.markdown("#### Weekly Price Inputs")
+            st.dataframe(weekly_inputs_df, use_container_width=True)
+
+        if not price_forecast_df.empty:
+            st.markdown("#### LCE Forecast Raw Output")
+            st.dataframe(price_forecast_df, use_container_width=True)
+
+    section_close()
+
+    st.markdown(
+        f"""
+        <div class="small-muted">
+        数据更新时间：{forecast.get("updated_at", "N/A") if forecast else "N/A"} ｜
+        本看板用于内部研究与决策支持，不构成投资承诺或交易建议。
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+if __name__ == "__main__":
+    main()

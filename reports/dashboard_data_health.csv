@@ -1,0 +1,26 @@
+﻿file_name,status,read_status,rows,columns,missing_required_columns,is_empty,allow_empty,critical,written,last_modified,notes
+aisc_dashboard_metrics.csv,ok,read_ok,17,4,,False,True,True,False,2026-06-15 00:17:17,
+dynamic_cost_curve.csv,ok,read_ok,33,37,,False,True,True,True,2026-06-17 00:22:46,alias:name->project_name;alias:project_name->project;alias:policy_risk_score->policy_risk_score_norm
+investment_recommendations.csv,ok,read_ok,33,27,,False,True,True,True,2026-06-17 00:22:46,alias:name->project_name;alias:project_name->project;alias:policy_risk_score->policy_risk_score_norm
+investment_recommendations_v2.csv,ok,read_ok,33,33,,False,True,False,False,2026-06-17 00:19:16,
+project_strategic_aisc_v2.csv,ok,read_ok,33,51,,False,True,False,False,2026-06-17 00:19:16,
+country_event_risk.csv,ok,read_ok,0,5,,True,True,False,False,2026-06-17 00:22:38,
+news_event_summary.csv,ok,read_ok,7,16,,False,True,False,True,2026-06-17 00:22:46,alias:url->source_url;alias:risk_score->policy_risk_score_norm
+weekly_critical_events.csv,ok,read_ok,1126,26,,False,True,False,False,2026-06-17 00:19:16,
+weekly_catl_impact.csv,ok,read_ok,748,8,,False,True,False,False,2026-06-13 22:39:43,
+weekly_decision_actions.csv,ok,read_ok,748,8,,False,True,False,False,2026-06-13 22:39:43,
+weekly_ai_brief.csv,ok,read_ok,1,11,,False,True,False,False,2026-06-13 22:39:43,
+weekly_price_inputs.csv,ok,read_ok,1,18,,False,True,False,True,2026-06-17 00:22:46,empty_column:gfex_inventory_change_tonnes;empty_column:inventory_source;empty_column:exchange_inventory_source
+document_market_inputs.csv,ok,read_ok,1,39,,False,True,False,True,2026-06-17 00:22:46,default:gfex_inventory_change_tonnes
+weekly_market_signals.csv,ok,derived,1,10,,False,True,False,True,2026-06-17 00:22:46,
+lce_price_forecast.csv,ok,read_ok,1,34,,False,True,True,False,2026-06-17 00:22:40,
+lce_price_history.csv,ok,read_ok,27,6,,False,True,False,False,2026-05-28 23:54:55,
+lce_price_timeseries.csv,ok,read_ok,13,10,,False,True,False,False,2026-06-17 00:22:41,
+lce_supply_demand_forecast.csv,ok,read_ok,6,19,,False,True,False,False,2026-06-17 00:22:43,
+policy_adjusted_price_scenarios_2026_2035.csv,ok,read_ok,30,9,,False,True,False,False,2026-06-14 23:00:34,
+policy_price_impact.csv,ok,read_ok,1,6,,False,True,False,False,2026-06-17 00:22:38,
+critical_minerals_policy_tracker.csv,ok,read_ok,71,21,,False,True,False,False,2026-06-17 00:19:16,
+policy_timeline_events.csv,ok,read_ok,206,22,,False,True,False,False,2026-06-17 00:19:16,
+policy_scored_table.csv,ok,read_ok,206,30,,False,True,False,False,2026-06-17 00:19:16,
+lithium_policy_decomposed_risk.csv,ok,read_ok,59,16,,False,True,False,False,2026-06-17 00:19:16,
+raw_disclosure_events.csv,ok,read_ok,415,26,,False,True,False,False,2026-06-17 00:19:16,

@@ -1,0 +1,2 @@
+﻿updated_at,price_signal,inventory_signal,market_validation_status,source_files,inventory_days,gfex_inventory_change_tonnes,current_lce_price_wan,strategic_aisc_p90_wan,cost_gap_wan
+2026-06-17 00:21:33,偏强验证,库存压制,偏强验证 / 库存压制,weekly_price_inputs.csv:read_ok;lce_price_forecast.csv:read_ok;document_market_inputs.csv:read_ok;aisc_dashboard_metrics.csv:read_ok,24.7,0.0,17.7725,12.05,5.7225

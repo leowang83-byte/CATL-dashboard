@@ -1,0 +1,10 @@
+project_name,country,region,owner_company,resource_type,status,estimated_resource_mt_lce,annual_capacity_t_lce,expected_start_year
+Greenbushes,Australia,Western Australia,Talison Lithium,hard rock,operating,8.300,160000,1983
+Pilgangoora,Australia,Western Australia,Pilbara Minerals,hard rock,operating,6.100,68000,2018
+Mt Cattlin,Australia,Western Australia,Arcadium Lithium,hard rock,operating,1.200,22000,2017
+Salar de Atacama,Chile,Antofagasta,SQM/Albemarle,brine,operating,9.200,210000,1997
+Cauchari-Olaroz,Argentina,Jujuy,Lithium Argentina,brine,ramp-up,5.400,40000,2023
+Thacker Pass,United States,Nevada,Lithium Americas,clay,development,6.700,80000,2027
+Manono,Democratic Republic of Congo,Tanganyika,AVZ Minerals,hard rock,development,5.400,70000,2028
+Kathleen Valley,Australia,Western Australia,Liontown Resources,hard rock,ramp-up,2.700,50000,2024
+

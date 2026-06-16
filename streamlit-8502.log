@@ -1,0 +1,79 @@
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8502
+  Network URL: http://192.168.4.101:8502
+
++------------------------- Traceback (most recent call last) --------------------------+
+| C:\Users\X1C                                                                         |
+| 2020\AppData\Local\Programs\Python\Python312\Lib\site-packages\streamlit\runtime\scr |
+| iptrunner\exec_code.py:129 in exec_func_with_error_handling                          |
+|                                                                                      |
+| C:\Users\X1C                                                                         |
+| 2020\AppData\Local\Programs\Python\Python312\Lib\site-packages\streamlit\runtime\scr |
+| iptrunner\script_runner.py:689 in code_to_exec                                       |
+|                                                                                      |
+| C:\lithium_news_system\dashboard.py:7348 in <module>                                 |
+|                                                                                      |
+|                                                                                      |
+| C:\lithium_news_system\dashboard.py:7255 in main                                     |
+|                                                                                      |
+|   7252                                                                               |
+|   7253         subsection_title(                                                     |
+|   7254             "第一层：短期价格判断",                                           |
+| > 7255             "关注未来半年价格区间、库存变化、SC6成本传导、GFEX期货预期与价格  |
+|   7256         )                                                                     |
+|   7257         render_section_02_price_forecast()                                    |
+|   7258                                                                               |
+|                                                                                      |
+| C:\lithium_news_system\dashboard.py:2602 in render_section_00_weekly_report          |
+|                                                                                      |
+|   2599                     <div class="weekly-market-text">                          |
+|   2600                         \u5f53\u524d\u7cfb\u7edf\u672a\u63a5\u5165\u6743\u5a0 |
+|   2601                     </div>                                                    |
+| > 2602                 </div>                                                        |
+|   2603             </div>                                                            |
+|   2604             """,                                                              |
+|   2605             unsafe_allow_html=True,                                           |
++--------------------------------------------------------------------------------------+
+KeyError: 'description'
++------------------------- Traceback (most recent call last) --------------------------+
+| C:\Users\X1C                                                                         |
+| 2020\AppData\Local\Programs\Python\Python312\Lib\site-packages\streamlit\runtime\scr |
+| iptrunner\exec_code.py:129 in exec_func_with_error_handling                          |
+|                                                                                      |
+| C:\Users\X1C                                                                         |
+| 2020\AppData\Local\Programs\Python\Python312\Lib\site-packages\streamlit\runtime\scr |
+| iptrunner\script_runner.py:689 in code_to_exec                                       |
+|                                                                                      |
+| C:\lithium_news_system\dashboard.py:7348 in <module>                                 |
+|                                                                                      |
+|   7345                                                                               |
+|   7346                                                                               |
+|   7347 if __name__ == "__main__":                                                    |
+| > 7348     main()                                                                    |
+|   7349                                                                               |
+|   7350                                                                               |
+|   7351                                                                               |
+|                                                                                      |
+| C:\lithium_news_system\dashboard.py:7255 in main                                     |
+|                                                                                      |
+|   7252         st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=Tru |
+|   7253                                                                               |
+|   7254     if top_nav == "CATL资源事业部周报":                                       |
+| > 7255         render_section_00_weekly_report()                                     |
+|   7256     elif top_nav == "核心驾驶舱":                                             |
+|   7257         render_with_gap(render_section_01_command_center)                     |
+|   7258     elif top_nav == "Market Monitor 市场监测中心":                            |
+|                                                                                      |
+| C:\lithium_news_system\dashboard.py:2602 in render_section_00_weekly_report          |
+|                                                                                      |
+|   2599                 inventory_summary_parts.append(f"东方财富/GFEX库存与仓单约 {g |
+|   2600             if gfex_inventory_change != 0:                                    |
+|   2601                 inventory_summary_parts.append(f"最新增减 {gfex_inventory_cha |
+| > 2602             inventory_summary_parts.append(inventory_signal["description"])   |
+|   2603             inventory_summary = "".join(inventory_summary_parts)              |
+|   2604         else:                                                                 |
+|   2605             inventory_status_tag = signal_tag("\u6570\u636e\u672a\u63a5\u5165 |
++--------------------------------------------------------------------------------------+
+KeyError: 'description'

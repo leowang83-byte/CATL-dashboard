@@ -1,0 +1,34 @@
+﻿id,name,country,latitude,longitude,resource_type,owner,status,aisc_cost,energy_cost,transport_cost
+12,Cauchari-Olaroz,Argentina,,,盐湖,Lithium Argentina / Ganfeng,Operating,45000,6000,7000
+11,Hombre Muerto,Argentina,,,盐湖,Various,Operating,45000,6000,7000
+17,Kachi,Argentina,,,盐湖,Lake Resources,Developing,45000,6000,7000
+13,Olaroz,Argentina,,,盐湖,Arcadium Lithium,Operating,45000,6000,7000
+14,Pastos Grandes,Argentina,,,盐湖,Various,Developing,45000,6000,7000
+16,Rincon,Argentina,,,盐湖,Rio Tinto,Developing,45000,6000,7000
+15,Sal de Vida,Argentina,,,盐湖,Arcadium Lithium,Developing,45000,6000,7000
+8,Finniss,Australia,-12.6712066,130.7747235,锂辉石,Core Lithium,Operating,80000,12000,6000
+1,Greenbushes,Australia,-33.86,116.06,锂辉石,Talison Lithium,Operating,80000,12000,5000
+6,Kathleen Valley,Australia,,,锂辉石,Liontown Resources,Developing,80000,12000,6000
+7,Mt Holland,Australia,,,锂辉石,Covalent Lithium,Developing,80000,12000,6000
+5,Mt Marion,Australia,,,锂辉石,Mineral Resources / Ganfeng,Operating,80000,12000,6000
+3,Pilgangoora,Australia,-21.05945,118.8955667,锂辉石,Pilbara Minerals,Operating,80000,12000,6000
+4,Wodgina,Australia,,,锂辉石,Mineral Resources / Albemarle,Operating,80000,12000,6000
+30,Grota do Cirilo,Brazil,,,锂辉石,Sigma Lithium,Operating,90000,8000,6000
+22,James Bay,Canada,,,锂辉石,Arcadium Lithium,Developing,95000,8000,8000
+23,North American Lithium,Canada,,,锂辉石,Sayona Mining / Piedmont,Operating,95000,8000,8000
+21,Whabouchi,Canada,,,锂辉石,Nemaska Lithium,Developing,95000,8000,8000
+2,Atacama,Chile,-23.3,-68.15,盐湖,SQM,Operating,40000,8000,3000
+9,Salar de Atacama,Chile,,,盐湖,SQM / Albemarle,Operating,45000,6000,7000
+10,Salar de Maricunga,Chile,,,盐湖,Various,Developing,45000,6000,7000
+32,Cinovec,Czech Republic,,,锂云母,European Metals,Developing,120000,8000,8000
+28,Manono,Democratic Republic of Congo,,,锂辉石,AVZ Minerals / Others,Developing,100000,10000,9000
+33,Zinnwald,Germany,,,锂云母,Zinnwald Lithium,Developing,120000,8000,8000
+29,Ewoyaa,Ghana,,,锂辉石,Atlantic Lithium,Developing,90000,10000,9000
+27,Goulamina,Mali,11.3495189,-7.9723181,锂辉石,Leo Lithium / Ganfeng,Developing,90000,10000,9000
+31,Mina do Barroso,Portugal,,,锂辉石,Savannah Resources,Developing,100000,8000,8000
+18,Silver Peak,United States,37.769312,-117.5767616,盐湖,Albemarle,Operating,60000,6000,8000
+20,Smackover Formation,United States,,,盐湖,Various,Exploration,60000,6000,8000
+19,Thacker Pass,United States,,,粘土型,Lithium Americas,Developing,110000,8000,8000
+25,Arcadia,Zimbabwe,,,锂辉石,Huayou Cobalt,Operating,90000,10000,9000
+24,Bikita,Zimbabwe,,,锂辉石,Sinomine,Operating,90000,10000,9000
+26,Zulu Lithium,Zimbabwe,,,锂辉石,Premier African Minerals,Developing,90000,10000,9000

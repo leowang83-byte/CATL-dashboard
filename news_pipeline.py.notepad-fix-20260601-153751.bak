@@ -1,0 +1,538 @@
+import os
+import hashlib
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import pandas as pd
+import requests
+from dotenv import load_dotenv
+
+from database import get_connection, load_table
+
+
+load_dotenv()
+
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=ENV_PATH, override=True)
+
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
+
+print("Loaded .env from:", ENV_PATH)
+print("NEWS_API_KEY loaded:", bool(NEWS_API_KEY))
+
+
+NEWS_QUERIES = [
+    "lithium mining supply disruption",
+    "lithium carbonate price supply",
+    "spodumene concentrate price",
+    "lithium mine production",
+    "lithium export ban",
+    "lithium mining policy",
+    "lithium royalty tax",
+    "Zimbabwe lithium export ban",
+    "Chile lithium policy",
+    "Argentina lithium brine project",
+    "Australia spodumene mine production",
+    "Mali lithium project",
+    "Ghana lithium project",
+    "Canada lithium mine project",
+    "lithium refinery processing capacity",
+    "lithium project permit approval",
+]
+
+
+REQUIRED_TERMS = [
+    "lithium",
+    "spodumene",
+    "lithium carbonate",
+    "lithium hydroxide",
+    "brine",
+    "lce",
+]
+
+
+RESOURCE_TERMS = [
+    "mine",
+    "mining",
+    "project",
+    "production",
+    "supply",
+    "export",
+    "permit",
+    "royalty",
+    "tax",
+    "policy",
+    "ban",
+    "shipment",
+    "concentrate",
+    "carbonate",
+    "price",
+    "spodumene",
+    "brine",
+    "refinery",
+    "processing",
+    "commissioning",
+    "ramp-up",
+    "restart",
+    "suspension",
+    "strike",
+    "government",
+    "environmental",
+    "approval",
+    "operation",
+    "capacity",
+    "ore",
+    "resource",
+    "reserve",
+]
+
+
+EXCLUDE_TERMS = [
+    "cordless",
+    "drill",
+    "impact driver",
+    "battery deal",
+    "lawn mower",
+    "robot",
+    "vacuum",
+    "phone",
+    "laptop",
+    "power bank",
+    "slickdeals",
+    "coupon",
+    "discount",
+    "sale",
+    "portable",
+    "charger",
+    "consumer",
+    "gadget",
+    "music",
+    "album",
+    "movie",
+    "game",
+    "homekit",
+    "switchbot",
+    "verizon",
+    "lexus",
+    "suv",
+    "e-bike",
+    "ebike",
+    "astronomers",
+    "mediterranean",
+    "fertilizer",
+    "data center",
+]
+
+
+COUNTRY_KEYWORDS = {
+    "China": [
+        "china",
+        "chinese",
+        "jiangxi",
+        "yichun",
+        "qinghai",
+        "sichuan",
+    ],
+    "Zimbabwe": [
+        "zimbabwe",
+        "harare",
+        "bikita",
+        "arcadia",
+        "zulu lithium",
+    ],
+    "Chile": [
+        "chile",
+        "chilean",
+        "atacama",
+        "sqm",
+        "salar",
+    ],
+    "Argentina": [
+        "argentina",
+        "cauchari",
+        "olaroz",
+        "hombre muerto",
+        "salta",
+        "jujuy",
+    ],
+    "Australia": [
+        "australia",
+        "australian",
+        "pilbara",
+        "greenbushes",
+        "wodgina",
+        "pilgangoora",
+        "mt marion",
+        "kathleen valley",
+    ],
+    "Canada": [
+        "canada",
+        "quebec",
+        "ontario",
+        "james bay",
+        "whabouchi",
+        "north american lithium",
+    ],
+    "United States": [
+        "united states",
+        "u.s.",
+        "usa",
+        "nevada",
+        "thacker pass",
+        "clayton valley",
+    ],
+    "Brazil": [
+        "brazil",
+        "minas gerais",
+        "grota do cirilo",
+    ],
+    "Mali": [
+        "mali",
+        "goulamina",
+    ],
+    "Ghana": [
+        "ghana",
+        "ewoyaa",
+    ],
+    "Portugal": [
+        "portugal",
+        "barroso",
+        "mina do barroso",
+    ],
+    "Czech Republic": [
+        "czech",
+        "cinovec",
+    ],
+}
+
+
+NEGATIVE_TERMS = [
+    "ban",
+    "delay",
+    "suspend",
+    "suspension",
+    "strike",
+    "protest",
+    "blocked",
+    "shortage",
+    "disruption",
+    "risk",
+    "tax",
+    "royalty",
+    "permit delay",
+    "environmental",
+    "lawsuit",
+    "fire",
+    "accident",
+    "lower production",
+    "cut output",
+    "export restriction",
+    "government intervention",
+]
+
+
+POSITIVE_TERMS = [
+    "approval",
+    "permit approved",
+    "commissioning",
+    "ramp-up",
+    "restart",
+    "expansion",
+    "increase production",
+    "record production",
+    "new capacity",
+    "funding",
+    "investment",
+    "offtake",
+]
+
+
+def normalize_text(value):
+    if value is None:
+        return ""
+    return str(value).lower()
+
+
+def is_relevant_lithium_resource_news(title, description=""):
+    text = f"{normalize_text(title)} {normalize_text(description)}"
+
+    if any(term in text for term in EXCLUDE_TERMS):
+        return False
+
+    has_lithium_term = any(term in text for term in REQUIRED_TERMS)
+    has_resource_term = any(term in text for term in RESOURCE_TERMS)
+
+    return has_lithium_term and has_resource_term
+
+
+def detect_country(title, description=""):
+    text = f"{normalize_text(title)} {normalize_text(description)}"
+
+    for country, keywords in COUNTRY_KEYWORDS.items():
+        for keyword in keywords:
+            if keyword.lower() in text:
+                return country
+
+    return "Global"
+
+
+def score_event(title, description=""):
+    text = f"{normalize_text(title)} {normalize_text(description)}"
+
+    negative_hits = sum(1 for term in NEGATIVE_TERMS if term in text)
+    positive_hits = sum(1 for term in POSITIVE_TERMS if term in text)
+
+    if negative_hits > 0:
+        risk_score = min(0.9, 0.45 + negative_hits * 0.15)
+        impact_direction = "negative"
+    elif positive_hits > 0:
+        risk_score = 0.25
+        impact_direction = "positive"
+    else:
+        risk_score = 0.35
+        impact_direction = "neutral"
+
+    return round(risk_score, 2), impact_direction
+
+
+def make_hash(title, url):
+    raw = f"{title}|{url}"
+    return hashlib.md5(raw.encode("utf-8")).hexdigest()
+
+
+def ensure_event_data_table():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS event_data (
+            id SERIAL PRIMARY KEY,
+            title TEXT,
+            source TEXT,
+            url TEXT UNIQUE,
+            keyword TEXT,
+            country TEXT,
+            published_at TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            risk_score FLOAT,
+            impact_direction TEXT,
+            event_hash TEXT UNIQUE
+        );
+        """
+    )
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def fetch_news_for_query(query, from_date, to_date):
+    if not NEWS_API_KEY:
+        raise RuntimeError("NEWS_API_KEY 未配置，请检查 .env 文件。")
+
+    url = "https://newsapi.org/v2/everything"
+
+    params = {
+        "q": query,
+        "from": from_date,
+        "to": to_date,
+        "language": "en",
+        "sortBy": "publishedAt",
+        "pageSize": 30,
+        "apiKey": NEWS_API_KEY,
+    }
+
+    response = requests.get(url, params=params, timeout=20)
+
+    if response.status_code != 200:
+        print("NewsAPI error:", response.status_code, response.text[:500])
+        return []
+
+    data = response.json()
+    return data.get("articles", [])
+
+
+def insert_event(article, keyword):
+    title = article.get("title") or ""
+    description = article.get("description") or ""
+    url = article.get("url") or ""
+    source = (article.get("source") or {}).get("name", "")
+    published_at = article.get("publishedAt")
+
+    if not title or not url:
+        return False
+
+    if not is_relevant_lithium_resource_news(title, description):
+        return False
+
+    country = detect_country(title, description)
+    risk_score, impact_direction = score_event(title, description)
+    event_hash = make_hash(title, url)
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(
+            """
+            INSERT INTO event_data (
+                title,
+                source,
+                url,
+                keyword,
+                country,
+                published_at,
+                risk_score,
+                impact_direction,
+                event_hash
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT DO NOTHING;
+            """,
+            (
+                title,
+                source,
+                url,
+                keyword,
+                country,
+                published_at,
+                risk_score,
+                impact_direction,
+                event_hash,
+            ),
+        )
+
+        inserted = cur.rowcount > 0
+        conn.commit()
+
+    except Exception as e:
+        print("Insert error:", e)
+        conn.rollback()
+        inserted = False
+
+    finally:
+        cur.close()
+        conn.close()
+
+    return inserted
+
+
+def build_country_event_risk():
+    try:
+        df = load_table("event_data")
+    except Exception:
+        df = pd.DataFrame()
+
+    if df.empty:
+        out = pd.DataFrame(
+            columns=[
+                "country",
+                "event_risk_score",
+                "event_count",
+                "negative_event_count",
+                "latest_event_title",
+            ]
+        )
+        out.to_csv(REPORTS_DIR / "country_event_risk.csv", index=False, encoding="utf-8-sig")
+        return out
+
+    if "country" not in df.columns:
+        df["country"] = "Global"
+
+    if "risk_score" not in df.columns:
+        df["risk_score"] = 0.35
+
+    if "impact_direction" not in df.columns:
+        df["impact_direction"] = "neutral"
+
+    if "created_at" in df.columns:
+        df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
+        df = df.sort_values("created_at")
+    else:
+        df["created_at"] = pd.Timestamp.now()
+
+    rows = []
+
+    for country, group in df.groupby("country"):
+        if country == "Global":
+            continue
+
+        event_count = len(group)
+        negative_event_count = int((group["impact_direction"] == "negative").sum())
+
+        avg_risk = pd.to_numeric(group["risk_score"], errors="coerce").fillna(0.35).mean()
+        max_risk = pd.to_numeric(group["risk_score"], errors="coerce").fillna(0.35).max()
+
+        event_risk_score = round(min(0.95, 0.6 * avg_risk + 0.4 * max_risk), 2)
+
+        latest_event_title = group.iloc[-1].get("title", "")
+
+        rows.append(
+            {
+                "country": country,
+                "event_risk_score": event_risk_score,
+                "event_count": event_count,
+                "negative_event_count": negative_event_count,
+                "latest_event_title": latest_event_title,
+            }
+        )
+
+    out = pd.DataFrame(rows)
+
+    if not out.empty:
+        out = out.sort_values("event_risk_score", ascending=False)
+
+    out.to_csv(
+        REPORTS_DIR / "country_event_risk.csv",
+        index=False,
+        encoding="utf-8-sig",
+    )
+
+    return out
+
+
+def main():
+    ensure_event_data_table()
+
+    to_date = datetime.now().date()
+    from_date = to_date - timedelta(days=7)
+
+    print("News search window:", from_date, "to", to_date)
+
+    total_fetched = 0
+    total_inserted = 0
+    total_relevant = 0
+
+    for query in NEWS_QUERIES:
+        articles = fetch_news_for_query(
+            query=query,
+            from_date=from_date.isoformat(),
+            to_date=to_date.isoformat(),
+        )
+
+        print("Query:", query, "Fetched:", len(articles))
+        total_fetched += len(articles)
+
+        for article in articles:
+            title = article.get("title") or ""
+            description = article.get("description") or ""
+
+            if is_relevant_lithium_resource_news(title, description):
+                total_relevant += 1
+
+            if insert_event(article, query):
+                total_inserted += 1
+
+    print("Fetched articles:", total_fetched)
+    print("Relevant articles:", total_relevant)
+    print("Inserted new articles into event_data:", total_inserted)
+
+    risk_df = build_country_event_risk()
+
+    print("Saved reports/country_event_risk.csv")
+    print(risk_df.to_string(index=False))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,18 @@
+﻿metric_name,metric_value,metric_unit,metric_desc
+project_count,33,个,项目总数。
+weighted_avg_strategic_aisc_wan,6.28,万元/吨,产能加权平均战略AISC。按 effective_capacity 加权计算。
+strategic_aisc_p90_wan,12.05,万元/吨,项目库90%战略AISC线。
+strategic_aisc_mean_wan,8.31,万元/吨,项目库简单平均战略AISC。
+current_lce_price_wan,18.2,万元/吨,当前LCE价格。
+price_margin_vs_weighted_avg_wan,11.92,万元/吨,当前LCE价格减去产能加权平均战略AISC。
+price_margin_vs_p90_wan,6.15,万元/吨,当前LCE价格减去项目库90%战略AISC。
+high_policy_premium_project_count,30,个,政策/战略风险溢价大于0的项目数。
+high_policy_premium_project_ratio,0.9091,ratio,高政策溢价项目占比。
+projects_below_current_price_count,33,个,战略AISC低于或等于当前LCE价格的项目数。
+projects_above_current_price_count,0,个,战略AISC高于当前LCE价格的项目数。
+strategic_aisc_below_price_ratio,1.0,ratio,战略AISC低于或等于当前LCE价格的项目占比。
+operational_adjustment_avg_wan,0.22,万元/吨,平均运营调整。
+strategic_premium_avg_wan,0.87,万元/吨,平均政策/战略风险溢价。
+top_policy_premium_project,Arcadia,项目,政策/战略风险溢价最高项目名称。
+top_strategic_aisc_project,Thacker Pass,项目,战略AISC最高项目名称。
+lowest_strategic_aisc_project,Hombre Muerto,项目,战略AISC最低项目名称。
