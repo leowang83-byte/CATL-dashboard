@@ -1,7 +1,8 @@
 ﻿from pathlib import Path
 import html
 import textwrap
-
+import streamlit as st
+NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
