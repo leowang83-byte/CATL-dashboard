@@ -8,6 +8,7 @@ TASKS = [
     ("Update RSS lithium news", "rss_pipeline.py"),
     ("Update NewsAPI risk events", "news_pipeline.py"),
     ("Run main resource decision model", "main.py"),
+    ("Build weekly decision actions", "weekly_decision_actions_generator.py"),
     ("Build LCE price forecast", "price_forecast.py"),
     ("Build LCE price time series", "price_timeseries.py"),
     ("Build LCE supply-demand forecast", "supply_demand_forecast.py"),
@@ -59,6 +60,7 @@ def main():
     print("- reports/investment_recommendations.csv")
     print("- reports/policy_price_impact.csv")
     print("- reports/weekly_market_signals.csv")
+    print("- reports/weekly_decision_actions.csv")
     print("- reports/dashboard_data_health.csv")
 
 

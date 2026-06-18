@@ -1,0 +1,12 @@
+[mcp_servers.devspace]
+command = "npx.cmd"
+args = ["-y", "devspace-mcp-server"]
+cwd = "C:\\lithium_news_system"
+startup_timeout_sec = 30
+tool_timeout_sec = 300
+default_tools_approval_mode = "prompt"
+disabled_tools = ["devspace_purge", "devspace_cleanup"]
+
+[mcp_servers.devspace.env]
+LOG_LEVEL = "info"
+DEVSPACE_TIMEOUT = "300000"

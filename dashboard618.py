@@ -88,7 +88,8 @@ PAPER_MIN_IRR = 0.12
 PAPER_DLE_TARGET_AISC_WAN = 4.50
 
 st.set_page_config(
-    page_title="全球锂资源智能决策驾驶舱DEMO--作者：王亮",
+    page_title="全球锂资源智能决策驾驶舱",
+    page_icon="🔋",
     layout="wide",
 )
 
@@ -2443,32 +2444,6 @@ def main():
             except Exception:
                 return "\u7b49\u5f85\u81ea\u52a8\u91c7\u96c6\u66f4\u65b0"
 
-        def format_event_time(value):
-            text = str(value or "").strip()
-            if not text or text.lower() == "nan":
-                return ""
-            try:
-                ts = pd.to_datetime(text, errors="coerce")
-                if pd.isna(ts):
-                    return ""
-                return ts.strftime("%Y-%m-%d %H:%M")
-            except Exception:
-                return text
-
-        def event_update_time(row):
-            for col in [
-                "updated_at",
-                "update_time",
-                "collected_at",
-                "fetched_at",
-                "ingested_at",
-                "created_at",
-            ]:
-                display_time = format_event_time(row.get(col, ""))
-                if display_time:
-                    return display_time
-            return file_update_text("weekly_critical_events.csv")
-
         def score_basis(row, impact_row):
             score = row.get("event_priority_score", "")
             event_type = row.get("event_type", "") or "\u4e8b\u4ef6"
@@ -2616,51 +2591,19 @@ def main():
             section_close()
             return
 
-        # TOP5：按CSV中最新事件所在自然周筛选，不再依赖历史 is_top_event 标记
         top_events_df = critical_events_df.copy()
-        top_events_df["event_priority_score"] = pd.to_numeric(
-            top_events_df.get("event_priority_score", 0),
-            errors="coerce",
-        ).fillna(0)
-        top_events_df["published_at_dt"] = pd.to_datetime(
-            top_events_df.get("published_at", pd.Series(dtype="object")),
-            errors="coerce",
-            utc=True,
-        )
-
-        valid_date_df = top_events_df.dropna(subset=["published_at_dt"]).copy()
-        if valid_date_df.empty:
-            top_events_df = (
-                top_events_df
-                .sort_values("event_priority_score", ascending=False)
-                .head(5)
-                .copy()
-            )
+        if "is_top_event" in top_events_df.columns:
+            top_events_df = top_events_df[top_events_df["is_top_event"].astype(str).str.lower().isin(["true", "1", "yes"])].copy()
         else:
-            latest_event_time = valid_date_df["published_at_dt"].max()
-            week_start = (latest_event_time - pd.Timedelta(days=int(latest_event_time.weekday()))).normalize()
-            week_end = week_start + pd.Timedelta(days=7)
-            weekly_df = valid_date_df[
-                (valid_date_df["published_at_dt"] >= week_start)
-                & (valid_date_df["published_at_dt"] < week_end)
-            ].copy()
-
-            if weekly_df.empty:
-                weekly_df = valid_date_df[
-                    valid_date_df["published_at_dt"] >= latest_event_time - pd.Timedelta(days=14)
-                ].copy()
-
-            top_events_df = (
-                weekly_df
-                .sort_values(["event_priority_score", "published_at_dt"], ascending=[False, False])
-                .head(5)
-                .copy()
-            )
+            top_events_df = pd.DataFrame()
 
         if top_events_df.empty:
             empty_state()
             section_close()
             return
+
+        top_events_df["event_priority_score"] = pd.to_numeric(top_events_df.get("event_priority_score", 0), errors="coerce").fillna(0)
+        top_events_df = top_events_df.sort_values("event_priority_score", ascending=False).head(5)
 
         impact_lookup = {}
         if not catl_impact_df.empty and "event_id" in catl_impact_df.columns:
@@ -2685,8 +2628,6 @@ def main():
             title_raw = row.get("title", "")
             source_url = str(row.get("source_url", "") or "").strip()
             link_html = original_link(source_url)
-            published_time = format_event_time(row.get("published_at", "")) or "暂无发布时间"
-            updated_time = event_update_time(row)
             if source_url and source_url.lower() != "nan":
                 title_html = f'<a class="weekly-brief-title" href="{esc(source_url)}" target="_blank" title="{esc(title_raw)}">{esc(title_cn)}</a>'
             else:
@@ -2716,7 +2657,6 @@ def main():
                             <div>{title_html}</div>
                             <div class="weekly-event-original">\u539f\u6587\uff1a{esc(title_raw)}</div>
                             <div class="weekly-event-meta">{esc(row.get('source', ''))} \uff5c {link_html}</div>
-                            <div class="weekly-event-meta">发布时间：{esc(published_time)} ｜ 更新时间：{esc(updated_time)}</div>
                             <div class="weekly-event-summary">{esc(event_summary)}</div>
                         </div>
                         <div class="weekly-event-side">

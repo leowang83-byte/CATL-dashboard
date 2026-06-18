@@ -88,7 +88,8 @@ PAPER_MIN_IRR = 0.12
 PAPER_DLE_TARGET_AISC_WAN = 4.50
 
 st.set_page_config(
-    page_title="全球锂资源智能决策驾驶舱DEMO--作者：王亮",
+    page_title="全球锂资源智能决策驾驶舱",
+    page_icon="🔋",
     layout="wide",
 )
 
@@ -781,6 +782,184 @@ def render_inventory_signal_panel(inventory_days):
         "该信号需结合现货价格、正极开工率、储能排产、GFEX仓单和AISC成本支撑共同判断。"
     )
 
+
+
+def render_catl_procurement_engine(forecast, price_zone=""):
+    """Render a cleaner CATL buyer-side procurement panel for the LCE price page."""
+    forecast = forecast or {}
+
+    expected_price_wan = safe_num(forecast.get("expected_lce_price", 0)) / 10000
+    lower_bound_wan = safe_num(forecast.get("lower_bound", 0)) / 10000
+    upper_bound_wan = safe_num(forecast.get("upper_bound", 0)) / 10000
+    reference_price_wan = expected_price_wan if expected_price_wan > 0 else PAPER_SPOT_PRICE_WAN
+
+    inventory_days = safe_num(forecast.get("inventory_days", 0))
+    cathode_utilization = safe_num(forecast.get("cathode_utilization", 0))
+    gfex_wan = safe_num(forecast.get("gfex_futures_price", 0)) / 10000
+    sc6_price = safe_num(forecast.get("sc6_price_index_usd_per_tonne", 0))
+    if sc6_price <= 0:
+        sc6_price = safe_num(forecast.get("sc6_price_index", 0))
+
+    basis_wan = None
+    if gfex_wan > 0 and reference_price_wan > 0:
+        basis_wan = gfex_wan - reference_price_wan
+
+    if reference_price_wan <= PAPER_PRICE_LOW_WAN:
+        price_regime = "补库窗口"
+        base_action = "低位区间，适合提前补库并争取长协锁量。"
+        intensity = 85
+        accent = "#16A34A"
+        accent_bg = "#ECFDF5"
+    elif reference_price_wan <= PAPER_PRICE_CENTER_WAN:
+        price_regime = "分批采购窗口"
+        base_action = "价格仍具性价比，宜分批建仓，保留回调补库空间。"
+        intensity = 68
+        accent = CATL_BLUE
+        accent_bg = "#EFF6FF"
+    elif reference_price_wan <= PAPER_PRICE_HIGH_WAN:
+        price_regime = "中性震荡区间"
+        base_action = "以按需采购为主，同时观察期现结构寻找锁价点。"
+        intensity = 48
+        accent = "#D97706"
+        accent_bg = "#FFFBEB"
+    else:
+        price_regime = "高位风险区"
+        base_action = "减少追高采购，优先控制敞口，等待更好回落窗口。"
+        intensity = 25
+        accent = "#C2410C"
+        accent_bg = "#FFF7ED"
+
+    inventory_signal = get_inventory_signal(inventory_days)
+    inventory_status = inventory_signal.get("status", "暂无数据")
+    inventory_color = inventory_signal.get("color", TEXT_MUTED)
+
+    if inventory_days > 0:
+        if inventory_days <= PAPER_INVENTORY_THRESHOLD_DAYS:
+            inventory_action = "库存低于14天阈值，补库优先级上升。"
+            intensity += 10
+        elif inventory_days <= PAPER_INVENTORY_NEUTRAL_DAYS:
+            inventory_action = "库存中性偏低，可执行分批补库。"
+            intensity += 4
+        elif inventory_days <= 30:
+            inventory_action = "库存仍可覆盖短期需求，维持按需采购。"
+        else:
+            inventory_action = "库存偏高，应控制现货采购节奏。"
+            intensity -= 12
+    else:
+        inventory_action = "库存数据未接入，等待库存信号确认。"
+        intensity -= 5
+
+    if basis_wan is None:
+        basis_text = "待接入"
+        hedge_action = "先补齐GFEX与现货价差，再判断套保方向。"
+    elif basis_wan >= 0.30:
+        basis_text = f"升水 {basis_wan:+.2f} 万元/吨"
+        hedge_action = "期货升水，市场预期偏强，可评估提前锁价。"
+        intensity += 5
+    elif basis_wan <= -0.30:
+        basis_text = f"贴水 {basis_wan:+.2f} 万元/吨"
+        hedge_action = "期货贴水，市场预期偏弱，除安全库存外不宜追高。"
+        intensity -= 5
+    else:
+        basis_text = f"平衡 {basis_wan:+.2f} 万元/吨"
+        hedge_action = "期现结构中性，维持滚动采购。"
+
+    intensity = max(0, min(intensity, 100))
+    if intensity >= 75:
+        final_action = "主动补库"
+        action_subtitle = "低位窗口明确，可提高锁量比例。"
+    elif intensity >= 55:
+        final_action = "分批采购"
+        action_subtitle = "保留节奏感，兼顾安全库存与价格弹性。"
+    elif intensity >= 35:
+        final_action = "按需采购"
+        action_subtitle = "以刚需覆盖为主，不扩大额外敞口。"
+    else:
+        final_action = "控制敞口 / 等待回落"
+        action_subtitle = "避免高位集中采购，优先风险管理。"
+
+    price_range_text = (
+        f"{lower_bound_wan:.2f}–{upper_bound_wan:.2f} 万元/吨"
+        if lower_bound_wan > 0 and upper_bound_wan > 0
+        else "预测区间待更新"
+    )
+    utilization_text = f"{cathode_utilization:.1%}" if cathode_utilization > 0 else "N/A"
+    sc6_text = f"{sc6_price:.0f} 美元/吨" if sc6_price > 0 else "N/A"
+    inventory_display = f"{inventory_days:.1f}天" if inventory_days > 0 else "N/A"
+
+    action_items = [
+        base_action,
+        inventory_action,
+        hedge_action,
+    ]
+    action_html = "".join(
+        f'<div style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;">'
+        f'<div style="width:18px;height:18px;border-radius:999px;background:{accent_bg};color:{accent};'
+        f'display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex:0 0 18px;">•</div>'
+        f'<div style="font-size:13px;line-height:1.55;color:{TEXT_DARK};">{html.escape(item)}</div>'
+        f'</div>'
+        for item in action_items
+    )
+
+    st.markdown("#### CATL采购决策引擎（LCE）")
+    st.markdown(
+        f"""
+        <div style="background:#FFFFFF;border:1px solid {BORDER};border-left:6px solid {accent};border-radius:14px;padding:16px 16px 14px 16px;box-shadow:0 2px 8px rgba(0, 58, 140, 0.06);margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+                <div>
+                    <div style="font-size:12px;color:{TEXT_MUTED};font-weight:800;letter-spacing:0.2px;">当前动作</div>
+                    <div style="font-size:18px;color:{accent};font-weight:900;line-height:1.25;margin-top:3px;">{html.escape(final_action)}</div>
+                    <div style="font-size:13px;color:{TEXT_DARK};line-height:1.5;margin-top:4px;">{html.escape(action_subtitle)}</div>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <span style="display:inline-block;padding:5px 10px;border-radius:999px;background:{accent_bg};color:{accent};font-size:12px;font-weight:900;">{html.escape(price_regime)}</span>
+                    <span style="display:inline-block;padding:5px 10px;border-radius:999px;background:#F8FAFC;color:{TEXT_MUTED};font-size:12px;font-weight:800;">{html.escape(price_zone or '价格区间判断')}</span>
+                </div>
+            </div>
+            {action_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    row1_col1, row1_col2 = st.columns(2)
+    with row1_col1:
+        st.markdown(
+            f"""
+            <div style="background:#FFFFFF;border:1px solid {BORDER};border-radius:12px;padding:12px 14px;min-height:102px;box-shadow:0 2px 6px rgba(0, 58, 140, 0.05);">
+                <div style="font-size:13px;color:{TEXT_MUTED};font-weight:800;">采购强度</div>
+                <div style="font-size:22px;color:{CATL_BLUE};font-weight:900;margin-top:6px;">{intensity:.0f}/100</div>
+                <div style="font-size:12px;color:{TEXT_MUTED};margin-top:5px;">0=观望，100=主动补库</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with row1_col2:
+        st.markdown(
+            f"""
+            <div style="background:#FFFFFF;border:1px solid {BORDER};border-radius:12px;padding:12px 14px;min-height:102px;box-shadow:0 2px 6px rgba(0, 58, 140, 0.05);">
+                <div style="font-size:13px;color:{TEXT_MUTED};font-weight:800;">价格区间</div>
+                <div style="font-size:22px;color:{CATL_BLUE};font-weight:900;margin-top:6px;">{html.escape(price_regime)}</div>
+                <div style="font-size:12px;color:{TEXT_MUTED};margin-top:5px;">参考价 {reference_price_wan:.2f} 万元/吨</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        f"""
+        <div style="background:#F8FAFC;border:1px solid {BORDER};border-radius:12px;padding:14px 15px;margin-top:10px;margin-bottom:12px;">
+            <div style="font-size:13px;color:{TEXT_MUTED};font-weight:800;margin-bottom:8px;">触发信号</div>
+            <div style="font-size:13px;color:{TEXT_DARK};line-height:1.75;">
+                <b>预测区间：</b>{html.escape(price_range_text)}<br>
+                <b>库存状态：</b><span style="color:{inventory_color};font-weight:900;">{html.escape(inventory_status)}</span>（{inventory_display}）<br>
+                <b>期现结构：</b>{html.escape(basis_text)}<br>
+                <b>SC6：</b>{html.escape(sc6_text)} ｜ <b>正极开工率：</b>{html.escape(utilization_text)}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 def kpi_card(label, value, note=""):
     st.markdown(
@@ -2443,32 +2622,6 @@ def main():
             except Exception:
                 return "\u7b49\u5f85\u81ea\u52a8\u91c7\u96c6\u66f4\u65b0"
 
-        def format_event_time(value):
-            text = str(value or "").strip()
-            if not text or text.lower() == "nan":
-                return ""
-            try:
-                ts = pd.to_datetime(text, errors="coerce")
-                if pd.isna(ts):
-                    return ""
-                return ts.strftime("%Y-%m-%d %H:%M")
-            except Exception:
-                return text
-
-        def event_update_time(row):
-            for col in [
-                "updated_at",
-                "update_time",
-                "collected_at",
-                "fetched_at",
-                "ingested_at",
-                "created_at",
-            ]:
-                display_time = format_event_time(row.get(col, ""))
-                if display_time:
-                    return display_time
-            return file_update_text("weekly_critical_events.csv")
-
         def score_basis(row, impact_row):
             score = row.get("event_priority_score", "")
             event_type = row.get("event_type", "") or "\u4e8b\u4ef6"
@@ -2616,51 +2769,19 @@ def main():
             section_close()
             return
 
-        # TOP5：按CSV中最新事件所在自然周筛选，不再依赖历史 is_top_event 标记
         top_events_df = critical_events_df.copy()
-        top_events_df["event_priority_score"] = pd.to_numeric(
-            top_events_df.get("event_priority_score", 0),
-            errors="coerce",
-        ).fillna(0)
-        top_events_df["published_at_dt"] = pd.to_datetime(
-            top_events_df.get("published_at", pd.Series(dtype="object")),
-            errors="coerce",
-            utc=True,
-        )
-
-        valid_date_df = top_events_df.dropna(subset=["published_at_dt"]).copy()
-        if valid_date_df.empty:
-            top_events_df = (
-                top_events_df
-                .sort_values("event_priority_score", ascending=False)
-                .head(5)
-                .copy()
-            )
+        if "is_top_event" in top_events_df.columns:
+            top_events_df = top_events_df[top_events_df["is_top_event"].astype(str).str.lower().isin(["true", "1", "yes"])].copy()
         else:
-            latest_event_time = valid_date_df["published_at_dt"].max()
-            week_start = (latest_event_time - pd.Timedelta(days=int(latest_event_time.weekday()))).normalize()
-            week_end = week_start + pd.Timedelta(days=7)
-            weekly_df = valid_date_df[
-                (valid_date_df["published_at_dt"] >= week_start)
-                & (valid_date_df["published_at_dt"] < week_end)
-            ].copy()
-
-            if weekly_df.empty:
-                weekly_df = valid_date_df[
-                    valid_date_df["published_at_dt"] >= latest_event_time - pd.Timedelta(days=14)
-                ].copy()
-
-            top_events_df = (
-                weekly_df
-                .sort_values(["event_priority_score", "published_at_dt"], ascending=[False, False])
-                .head(5)
-                .copy()
-            )
+            top_events_df = pd.DataFrame()
 
         if top_events_df.empty:
             empty_state()
             section_close()
             return
+
+        top_events_df["event_priority_score"] = pd.to_numeric(top_events_df.get("event_priority_score", 0), errors="coerce").fillna(0)
+        top_events_df = top_events_df.sort_values("event_priority_score", ascending=False).head(5)
 
         impact_lookup = {}
         if not catl_impact_df.empty and "event_id" in catl_impact_df.columns:
@@ -2685,8 +2806,6 @@ def main():
             title_raw = row.get("title", "")
             source_url = str(row.get("source_url", "") or "").strip()
             link_html = original_link(source_url)
-            published_time = format_event_time(row.get("published_at", "")) or "暂无发布时间"
-            updated_time = event_update_time(row)
             if source_url and source_url.lower() != "nan":
                 title_html = f'<a class="weekly-brief-title" href="{esc(source_url)}" target="_blank" title="{esc(title_raw)}">{esc(title_cn)}</a>'
             else:
@@ -2716,7 +2835,6 @@ def main():
                             <div>{title_html}</div>
                             <div class="weekly-event-original">\u539f\u6587\uff1a{esc(title_raw)}</div>
                             <div class="weekly-event-meta">{esc(row.get('source', ''))} \uff5c {link_html}</div>
-                            <div class="weekly-event-meta">发布时间：{esc(published_time)} ｜ 更新时间：{esc(updated_time)}</div>
                             <div class="weekly-event-summary">{esc(event_summary)}</div>
                         </div>
                         <div class="weekly-event-side">
@@ -3335,7 +3453,7 @@ def main():
         section_close()
         return
     # =========================
-    # 02 LCE价格预测与生产者策略
+    # 02 LCE价格预测与CATL采购决策
     # =========================
 
     def render_section_02_price_forecast():
@@ -3734,17 +3852,21 @@ def main():
                         y_min = min(y_values)
                         y_max = max(y_values)
                         y_padding = max((y_max - y_min) * 0.25, 0.8)
+                        # 从14万元/吨开始展示纵轴，避免0轴拉低图表信息密度。
                         y_range = [
-                            max(0, y_min - y_padding),
-                            y_max + y_padding,
+                            14,
+                            max(y_max + y_padding, 22),
                         ]
                     else:
-                        y_range = [16, 21]
+                        y_range = [14, 22]
+
+                    y_tick_upper = int(max(y_range[1], 22))
+                    y_tick_values = list(range(14, y_tick_upper + 1, 2))
     
                     fig_ts.update_layout(
                         xaxis_title="日期",
                         yaxis_title="LCE价格（万元/吨）",
-                        height=520,
+                        height=640,
                         hovermode="x unified",
                         legend=dict(
                             orientation="h",
@@ -3794,6 +3916,8 @@ def main():
     
                     fig_ts.update_yaxes(
                         range=y_range,
+                        tickmode="array",
+                        tickvals=y_tick_values,
                         showgrid=True,
                         gridcolor="#E5E7EB",
                         zeroline=False,
@@ -3809,84 +3933,42 @@ def main():
                     )
     
                     st.plotly_chart(fig_ts, width="stretch")
-                    if has_forecast_band_correction:
-                        st.caption("部分未来预测区间已按中枢自动校正，用于避免展示冲突；原始CSV数据未被修改。")
     
             with strategy_col:
-                inventory_signal = get_inventory_signal(
-                    safe_num(forecast.get("inventory_days", 0))
-                )
-                inventory_signal_color = inventory_signal.get("color", TEXT_MUTED)
-                inventory_signal_status = inventory_signal.get("status", "暂无数据")
+                render_catl_procurement_engine(forecast, price_zone)
 
-                st.markdown("#### 价格区间判断")
-                st.markdown(
-                    f"""
-                    <div class="strategy-box">
-                    <b>{price_zone if price_zone else "暂无判断"}</b><br>
-                    <span style="color:{inventory_signal_color};font-weight:800;">
-                    库存状态：{inventory_signal_status}
-                    </span>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
+            st.markdown("#### 核心输入")
+            input_m1, input_m2, input_m3 = st.columns(3)
+
+            with input_m1:
+                compact_metric_card(
+                    "GFEX期货价格",
+                    format_wan(forecast.get("gfex_futures_price", 0)),
+                    "元/吨LCE口径",
                 )
-    
-                st.markdown("#### 生产者策略建议")
-                st.markdown(
-                    f"""
-                    <div class="strategy-box">
-                    {producer_strategy if producer_strategy else "暂无生产者策略建议。"}
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
+
+            with input_m2:
+                sc6_price = forecast.get("sc6_price_index_usd_per_tonne", 0)
+                if sc6_price <= 0:
+                    sc6_price = forecast.get("sc6_price_index", 0)
+
+                compact_metric_card(
+                    "SC6价格",
+                    f"{sc6_price:.0f} 美元/吨",
+                    "锂精矿价格",
                 )
-    
-                st.markdown("#### 核心输入")
-    
-                input_m1, input_m2 = st.columns(2)
-    
-                with input_m1:
-                    compact_metric_card(
-                        "GFEX期货价格",
-                        format_wan(forecast.get("gfex_futures_price", 0)),
-                        "元/吨LCE口径",
-                    )
-    
-                with input_m2:
-                    sc6_price = forecast.get("sc6_price_index_usd_per_tonne", 0)
-                    if sc6_price <= 0:
-                        sc6_price = forecast.get("sc6_price_index", 0)
-    
-                    compact_metric_card(
-                        "SC6价格",
-                        f"{sc6_price:.0f} 美元/吨",
-                        "锂精矿价格",
-                    )
-    
-                input_m3, input_m4 = st.columns(2)
-    
-                with input_m3:
-                    compact_metric_card(
-                        "库存天数",
-                        f"{forecast.get('inventory_days', 0):.1f} 天",
-                        "下游库存周转",
-                    )
-    
-                with input_m4:
-                    compact_metric_card(
-                        "正极开工率",
-                        f"{forecast.get('cathode_utilization', 0):.1%}",
-                        "需求侧强度",
-                    )
+
+            with input_m3:
+                compact_metric_card(
+                    "正极开工率",
+                    f"{forecast.get('cathode_utilization', 0):.1%}",
+                    "需求侧强度",
+                )
+
             # =========================
-            # 价格模型因子贡献
-            # =========================
-    
-                   # =========================
             # 价格驱动因子强度
             # =========================
-    
+
             inventory_days = forecast.get("inventory_days", 0)
 
             current_inventory_days = safe_num(forecast.get("inventory_days", 0))
@@ -5628,13 +5710,13 @@ def main():
 
 
     def render_section_06_resource_portfolio_allocation():
-        section_header("06", "CATL资源锁量策略与样本观察池")
+        section_header("06", "资源组合配置建议")
         section_open()
 
         portfolio_df = project_strategic_aisc_df.copy()
 
         if portfolio_df.empty:
-            st.info("暂无 project_strategic_aisc_v2.csv，暂无法生成 CATL资源锁量策略与样本观察池。")
+            st.info("暂无 project_strategic_aisc_v2.csv，暂无法生成战略AISC口径下的资源组合配置建议。")
             section_close()
             return
 
@@ -5671,22 +5753,33 @@ def main():
 
         if "resource_type" not in portfolio_df.columns:
             portfolio_df["resource_type"] = "Unknown"
+
         if "country" not in portfolio_df.columns:
             portfolio_df["country"] = "Unknown"
+
         if "project_name" not in portfolio_df.columns:
             portfolio_df["project_name"] = portfolio_df.get("project", portfolio_df.get("name", "Unknown"))
+
         if "investment_tier" not in portfolio_df.columns:
             portfolio_df["investment_tier"] = "未分层"
+
         if "recommended_action_v2" not in portfolio_df.columns:
-            portfolio_df["recommended_action_v2"] = "持续跟踪"
+            portfolio_df["recommended_action_v2"] = portfolio_df.get("is_investable", "持续跟踪")
+
         if "key_risk_note" not in portfolio_df.columns:
             portfolio_df["key_risk_note"] = portfolio_df.get("adjustment_reason", "")
 
         portfolio_df = portfolio_df[portfolio_df["strategic_aisc_wan"] > 0].copy()
+
         if portfolio_df.empty:
-            st.info("暂无有效战略AISC项目数据，暂无法生成 CATL资源锁量策略与样本观察池。")
+            st.info("暂无有效战略AISC项目数据，暂无法生成资源组合配置建议。")
             section_close()
             return
+
+        portfolio_df["annual_capacity"] = portfolio_df["annual_capacity"].clip(lower=0)
+        portfolio_df["strategic_score_norm"] = (
+            portfolio_df["strategic_investment_score"].clip(lower=0, upper=100) / 100
+        )
 
         def portfolio_resource_bucket(resource_type):
             resource_type = str(resource_type).lower()
@@ -5696,18 +5789,52 @@ def main():
                 return "锂辉石"
             if "lepidolite" in resource_type or "mica" in resource_type or "zinnwaldite" in resource_type or "云母" in resource_type:
                 return "云母"
-            return "黏土 / 其他"
+            if "clay" in resource_type:
+                return "黏土型锂"
+            if "recycl" in resource_type or "回收" in resource_type:
+                return "回收锂"
+            return "其他资源"
 
-        resource_value_map = {
-            "锂辉石": 1.00,
-            "盐湖": 0.90,
-            "云母": 0.55,
-            "黏土 / 其他": 0.40,
-        }
+        portfolio_df["portfolio_resource_type"] = portfolio_df["resource_type"].apply(
+            portfolio_resource_bucket
+        )
+        portfolio_df["portfolio_weight_base"] = (
+            portfolio_df["annual_capacity"].where(portfolio_df["annual_capacity"] > 0, 1)
+            * portfolio_df["strategic_score_norm"].clip(lower=0.05)
+            / portfolio_df["strategic_aisc_wan"]
+        )
 
-        portfolio_df["portfolio_resource_type"] = portfolio_df["resource_type"].apply(portfolio_resource_bucket)
-        portfolio_df["annual_capacity"] = portfolio_df["annual_capacity"].clip(lower=0)
+        allocation_df = (
+            portfolio_df
+            .groupby("portfolio_resource_type", as_index=False)
+            .agg(weight_base=("portfolio_weight_base", "sum"))
+        )
 
+        total_weight_base = allocation_df["weight_base"].sum()
+        if total_weight_base <= 0:
+            allocation_df["weight"] = 1 / len(allocation_df)
+        else:
+            allocation_df["weight"] = allocation_df["weight_base"] / total_weight_base
+
+        country_df = (
+            portfolio_df
+            .groupby("country", as_index=False)
+            .agg(weight_base=("portfolio_weight_base", "sum"))
+        )
+        total_country_weight = country_df["weight_base"].sum()
+        if total_country_weight <= 0:
+            country_df["weight"] = 1 / len(country_df)
+        else:
+            country_df["weight"] = country_df["weight_base"] / total_country_weight
+        country_df = country_df.sort_values("weight", ascending=True).tail(10)
+
+        capacity_weight = portfolio_df["annual_capacity"].clip(lower=0)
+        if capacity_weight.sum() <= 0:
+            capacity_weight = pd.Series(1, index=portfolio_df.index)
+
+        weighted_strategic_aisc = (
+            portfolio_df["strategic_aisc_wan"] * capacity_weight
+        ).sum() / capacity_weight.sum()
         current_lce_price_wan = (
             pd.to_numeric(portfolio_df.get("current_lce_price_wan", pd.Series(dtype=float)), errors="coerce")
             .dropna()
@@ -5716,320 +5843,128 @@ def main():
             and not pd.to_numeric(portfolio_df["current_lce_price_wan"], errors="coerce").dropna().empty
             else PAPER_PRICE_CENTER_WAN
         )
-
-        cap_max = max(float(portfolio_df["annual_capacity"].max()), 1.0)
-        premium_ceiling = max(float(portfolio_df["policy_risk_premium_wan"].max()), 1.0)
-        score_max = max(float(portfolio_df["strategic_investment_score"].max()), 1.0)
-
-        portfolio_df["cost_safety_score"] = (portfolio_df["price_margin_wan"] / max(current_lce_price_wan, 1.0)).clip(lower=0, upper=1)
-        portfolio_df["capacity_delivery_score"] = (portfolio_df["annual_capacity"] / cap_max).clip(lower=0, upper=1)
-        portfolio_df["policy_access_score"] = (1 - portfolio_df["policy_risk_premium_wan"] / premium_ceiling).clip(lower=0, upper=1)
-        portfolio_df["resource_value_score"] = portfolio_df["portfolio_resource_type"].map(resource_value_map).fillna(0.50)
-        portfolio_df["project_readiness_score"] = (portfolio_df["strategic_investment_score"] / score_max).clip(lower=0, upper=1)
-
-        portfolio_df["catl_lock_priority_score"] = (
-            portfolio_df["cost_safety_score"] * 0.30
-            + portfolio_df["capacity_delivery_score"] * 0.25
-            + portfolio_df["policy_access_score"] * 0.20
-            + portfolio_df["resource_value_score"] * 0.15
-            + portfolio_df["project_readiness_score"] * 0.10
-        ) * 100
-
-        def star_label(score):
-            if score >= 85:
-                return "★★★★★"
-            if score >= 70:
-                return "★★★★☆"
-            if score >= 55:
-                return "★★★☆☆"
-            if score >= 40:
-                return "★★☆☆☆"
-            return "★☆☆☆☆"
-
-        portfolio_df["sample_priority_star"] = portfolio_df["catl_lock_priority_score"].apply(star_label)
-
-        def risk_label(x):
-            if x > 0.70:
-                return "高"
-            if x > 0.30:
-                return "较高"
-            if x > 0.05:
-                return "中"
-            return "低"
-
-        portfolio_df["risk_review_level"] = portfolio_df["policy_risk_premium_wan"].apply(risk_label)
-
-        def catl_action(row):
-            if row["price_margin_wan"] > 0 and row["policy_risk_premium_wan"] <= 0.30 and row["annual_capacity"] > 0:
-                return "长协 / 包销评估"
-            if row["price_margin_wan"] > 0 and row["policy_risk_premium_wan"] > 0.30:
-                return "政策复核 / 谈判保护"
-            if row["catl_lock_priority_score"] >= 55:
-                return "联合开发评估"
-            if row["policy_risk_premium_wan"] > 0.70 or row["price_margin_wan"] < 0:
-                return "风险观察"
-            return "持续跟踪"
-
-        portfolio_df["catl_action_guidance"] = portfolio_df.apply(catl_action, axis=1)
-
-        portfolio_df["priority_weight_base"] = (
-            portfolio_df["annual_capacity"].where(portfolio_df["annual_capacity"] > 0, 1)
-            * portfolio_df["catl_lock_priority_score"].clip(lower=1)
-            / portfolio_df["strategic_aisc_wan"]
-        )
-
-        allocation_df = (
-            portfolio_df.groupby("portfolio_resource_type", as_index=False)
-            .agg(weight_base=("priority_weight_base", "sum"))
-        )
-        total_weight_base = allocation_df["weight_base"].sum()
-        if total_weight_base > 0:
-            allocation_df["weight"] = allocation_df["weight_base"] / total_weight_base
-        else:
-            allocation_df["weight"] = 1 / max(len(allocation_df), 1)
-        allocation_df = allocation_df.sort_values("weight", ascending=False)
-
-        country_df = (
-            portfolio_df.groupby("country", as_index=False)
-            .agg(
-                exposure_base=("priority_weight_base", "sum"),
-                avg_policy_premium=("policy_risk_premium_wan", "mean"),
-                sample_count=("project_name", "count"),
-            )
-        )
-        max_exposure = max(float(country_df["exposure_base"].max()), 1.0)
-        country_df["exposure_score"] = (country_df["exposure_base"] / max_exposure * 30).round(0)
-        country_df["risk_flag"] = country_df["avg_policy_premium"].apply(lambda x: "较高风险" if x > 0.30 else "中低风险")
-        country_df = country_df.sort_values(["exposure_score", "avg_policy_premium"], ascending=[False, False]).head(10)
-        country_df = country_df.sort_values("exposure_score", ascending=True)
-
-        capacity_weight = portfolio_df["annual_capacity"].clip(lower=0)
-        if capacity_weight.sum() <= 0:
-            capacity_weight = pd.Series(1, index=portfolio_df.index)
-        weighted_strategic_aisc = (portfolio_df["strategic_aisc_wan"] * capacity_weight).sum() / capacity_weight.sum()
-        covered_ratio = float((portfolio_df["price_margin_wan"] > 0).mean())
-        policy_review_ratio = float((portfolio_df["policy_risk_premium_wan"] > 0.30).mean())
-        top_resource = allocation_df.iloc[0]["portfolio_resource_type"] if not allocation_df.empty else "锂资源样本"
-
-        st.markdown(
-            """
-            <div style="background:#F7FBFF;border:1px solid #B3D0F7;border-radius:12px;padding:12px 16px;margin-bottom:14px;">
-                <div style="font-size:14px;color:#003A8C;font-weight:800;margin-bottom:4px;">说明</div>
-                <div style="font-size:13px;color:#374151;line-height:1.6;">
-                本模块基于33个全球锂资源观察样本进行结构化测算，仅用于评估资源类型、国家风险、成本安全垫与锁量优先级，
-                不代表CATL实际持仓、投资计划或资产配置比例。
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        covered_ratio = float((portfolio_df["strategic_aisc_wan"] <= current_lce_price_wan).mean())
+        high_policy_ratio = float((portfolio_df["policy_risk_premium_wan"] > 0).mean())
+        top_resource = allocation_df.sort_values("weight", ascending=False).iloc[0]["portfolio_resource_type"]
+        top_country = country_df.sort_values("weight", ascending=False).iloc[0]["country"]
 
         kpi1, kpi2, kpi3, kpi4 = st.columns(4)
         with kpi1:
-            compact_metric_card("锁量优先资源类型", top_resource, "样本优先级最高")
+            compact_metric_card("推荐配置主线", top_resource, f"国家暴露集中于 {top_country}")
         with kpi2:
-            compact_metric_card("样本加权可获得成本", f"{weighted_strategic_aisc:.2f}", "万元/吨 LCE")
+            compact_metric_card("产能加权战略AISC", f"{weighted_strategic_aisc:.2f}", "万元/吨 LCE")
         with kpi3:
-            compact_metric_card("价格安全垫样本占比", f"{covered_ratio:.0%}", f"当前LCE {current_lce_price_wan:.1f} 万元/吨")
+            compact_metric_card("价格覆盖样本占比", f"{covered_ratio:.0%}", f"当前LCE {current_lce_price_wan:.1f} 万元/吨")
         with kpi4:
-            compact_metric_card("政策风险需复核比例", f"{policy_review_ratio:.0%}", "出口限制 / 税费 / 审批")
+            compact_metric_card("高政策风险暴露", f"{high_policy_ratio:.0%}", "政策风险溢价 > 0")
 
         st.markdown(
             """
             <div class="insight-box">
-            <b>CATL锁量优先级口径：</b>
-            成本安全垫 × 30% ＋ 产能兑现能力 × 25% ＋ 政策可获得性 × 20% ＋ 资源类型战略价值 × 15% ＋ 项目进度确定性 × 10%。
-            该口径用于把33个行业资源样本转化为锁量、采购、尽调和风险监控优先级，而不是模拟真实资产配置。
+            <b>组合建议口径：</b>
+            本模块使用战略AISC而非传统调整后AISC，建议权重为展示型 proxy：
+            产能贡献 × 战略投资评分 ÷ 战略AISC。
+            它用于解释资源配置优先级，不等同于财务组合优化或已执行投资决策。
             </div>
             """,
             unsafe_allow_html=True,
         )
 
+        portfolio_colors = ["#003A8C", "#1677FF", "#00AB96", "#B3D0F7", "#6B7280", "#D1D5DB"]
+
         chart_left, chart_right = st.columns([1, 1])
+
         with chart_left:
-            resource_bar_colors = ["#0035A8", "#1A5AD4", "#7DB3FF", "#CFE1FF"]
-            fig_resource = go.Figure(
-                go.Bar(
-                    x=(allocation_df["weight"] * 100).round(1),
-                    y=allocation_df["portfolio_resource_type"],
-                    orientation="h",
-                    marker=dict(
-                        color=resource_bar_colors[: len(allocation_df)],
-                        line=dict(color="rgba(0,0,0,0)", width=0),
-                    ),
-                    text=[f"{v:.0f}%" for v in allocation_df["weight"] * 100],
-                    textposition="outside",
-                    hovertemplate="资源类型：%{y}<br>样本优先级权重：%{x:.1f}%<extra></extra>",
-                )
+            fig_portfolio = go.Figure(
+                data=[
+                    go.Pie(
+                        labels=allocation_df["portfolio_resource_type"],
+                        values=allocation_df["weight"],
+                        hole=0.58,
+                        marker=dict(
+                            colors=portfolio_colors[:len(allocation_df)],
+                            line=dict(color="#FFFFFF", width=2),
+                        ),
+                        textinfo="label+percent",
+                        textfont=dict(color=TEXT_DARK, size=13),
+                        hovertemplate="%{label}<br>推荐权重：%{percent}<extra></extra>",
+                    )
+                ]
             )
-            fig_resource.update_layout(
-                title=dict(text="资源类型优先级结构｜样本测算", font=dict(color="#003A8C", size=20)),
+            fig_portfolio.update_layout(
+                title=dict(
+                    text="推荐资源类型配置｜权重 proxy",
+                    font=dict(color="#003A8C", size=20),
+                ),
                 height=420,
                 paper_bgcolor="#FFFFFF",
                 plot_bgcolor="#FFFFFF",
-                margin=dict(l=80, r=30, t=60, b=50),
+                margin=dict(l=20, r=20, t=60, b=30),
                 font=dict(color=TEXT_DARK, size=13),
-                xaxis=dict(title="样本权重（%）", gridcolor="#E5E7EB", ticksuffix="%"),
-                yaxis=dict(gridcolor="#E5E7EB", categoryorder="total ascending"),
-                showlegend=False,
+                showlegend=True,
+                legend=dict(orientation="h", y=-0.08, x=0.5, xanchor="center"),
             )
-            st.plotly_chart(fig_resource, width="stretch", key="catl_resource_structure_v15")
+            st.plotly_chart(fig_portfolio, width="stretch")
 
         with chart_right:
-            low_risk_df = country_df[country_df["risk_flag"] == "中低风险"].copy()
-            high_risk_df = country_df[country_df["risk_flag"] == "较高风险"].copy()
-
-            fig_country = go.Figure()
-
-            fig_country.add_trace(
+            fig_country = go.Figure(
                 go.Bar(
-                    x=low_risk_df["exposure_score"],
-                    y=low_risk_df["country"],
+                    x=country_df["weight"],
+                    y=country_df["country"],
                     orientation="h",
-                    name="中低风险",
-                    marker=dict(color="#1677FF", line=dict(color="rgba(0,0,0,0)", width=0)),
-                    text=low_risk_df["exposure_score"].astype(int).astype(str),
+                    marker=dict(
+                        color="#1677FF",
+                        line=dict(color="#003A8C", width=1),
+                    ),
+                    text=[f"{value:.1%}" for value in country_df["weight"]],
                     textposition="outside",
-                    hovertemplate="国家：%{y}<br>风险与供应暴露评分：%{x}<extra></extra>",
+                    hovertemplate="国家：%{y}<br>配置权重：%{x:.1%}<extra></extra>",
                 )
             )
-
-            fig_country.add_trace(
-                go.Bar(
-                    x=high_risk_df["exposure_score"],
-                    y=high_risk_df["country"],
-                    orientation="h",
-                    name="较高风险",
-                    marker=dict(color="#FF6B35", line=dict(color="rgba(0,0,0,0)", width=0)),
-                    text=high_risk_df["exposure_score"].astype(int).astype(str),
-                    textposition="outside",
-                    hovertemplate="国家：%{y}<br>风险与供应暴露评分：%{x}<extra></extra>",
-                )
-            )
-
             fig_country.update_layout(
-                title=dict(text="资源国风险与供应暴露｜样本池", font=dict(color="#003A8C", size=20)),
-                height=460,
+                title=dict(
+                    text="资源国暴露 Top 10",
+                    font=dict(color="#003A8C", size=20),
+                ),
+                height=420,
                 paper_bgcolor="#FFFFFF",
                 plot_bgcolor="#FFFFFF",
-                margin=dict(l=90, r=40, t=60, b=90),
+                margin=dict(l=90, r=40, t=60, b=40),
                 font=dict(color=TEXT_DARK, size=13),
-                xaxis=dict(title="风险与供应暴露评分（越高越高）", gridcolor="#E5E7EB"),
-                yaxis=dict(gridcolor="#E5E7EB", categoryorder="total ascending"),
-                barmode="overlay",
-                showlegend=True,
-                legend=dict(
-                    orientation="h",
-                    yanchor="top",
-                    y=-0.18,
-                    xanchor="center",
-                    x=0.5,
-                    font=dict(size=12, color=TEXT_MUTED),
-                ),
+                xaxis=dict(tickformat=".0%", gridcolor="#E5E7EB"),
+                yaxis=dict(gridcolor="#E5E7EB"),
+                showlegend=False,
             )
-            st.plotly_chart(fig_country, width="stretch", key="catl_country_exposure_v15")
+            st.plotly_chart(fig_country, width="stretch")
 
-        st.markdown("#### 优先跟踪样本 Top 10")
+        st.markdown("#### 配置建议 Top 10 项目")
         top_projects_df = portfolio_df.sort_values(
-            ["catl_lock_priority_score", "price_margin_wan", "annual_capacity"],
-            ascending=[False, False, False],
+            "portfolio_weight_base",
+            ascending=False,
         ).head(10).copy()
         top_projects_display = pd.DataFrame(
             {
-                "样本项目": top_projects_df["project_name"],
+                "项目": top_projects_df["project_name"],
                 "国家": top_projects_df["country"],
                 "资源类型": top_projects_df["portfolio_resource_type"],
-                "样本优先级": top_projects_df["sample_priority_star"],
-                "战略可获得成本（万元/吨 LCE）": top_projects_df["strategic_aisc_wan"].round(2),
+                "战略AISC（万元/吨）": top_projects_df["strategic_aisc_wan"].round(2),
                 "价格安全垫（万元/吨）": top_projects_df["price_margin_wan"].round(2),
-                "需复核风险": top_projects_df["risk_review_level"],
-                "CATL动作建议": top_projects_df["catl_action_guidance"],
+                "政策风险溢价（万元/吨）": top_projects_df["policy_risk_premium_wan"].round(2),
+                "Tier": top_projects_df["investment_tier"],
+                "建议动作": top_projects_df["recommended_action_v2"],
+                "核心风险": top_projects_df["key_risk_note"],
             }
         )
         st.dataframe(top_projects_display, width="stretch", hide_index=True)
 
-        active_lock_df = portfolio_df[(portfolio_df["price_margin_wan"] > 0) & (portfolio_df["policy_risk_premium_wan"] <= 0.30)].copy()
-        negotiation_df = portfolio_df[(portfolio_df["price_margin_wan"] > 0) & (portfolio_df["policy_risk_premium_wan"] > 0.30)].copy()
-        wait_df = portfolio_df[(portfolio_df["price_margin_wan"] <= 0.80) & (portfolio_df["catl_lock_priority_score"] >= 45) & (portfolio_df["policy_risk_premium_wan"] <= 0.70)].copy()
-        warning_df = portfolio_df[(portfolio_df["price_margin_wan"] <= 0) | (portfolio_df["policy_risk_premium_wan"] > 0.70)].copy()
-
-        def zone_card(title, color, bg, border, bullets):
-            bullet_html = "".join([f"<li style='margin-bottom:6px;'>{item}</li>" for item in bullets])
-            return f"""
-                <div style='background:{bg};border:1px solid {border};border-radius:14px;padding:14px 16px;height:100%;'>
-                    <div style='font-size:20px;font-weight:900;color:{color};margin-bottom:8px;'>{title}</div>
-                    <ul style='padding-left:18px;margin:0;color:#374151;font-size:13px;line-height:1.65;'>{bullet_html}</ul>
-                </div>
-            """
-
-        st.markdown("#### CATL动作分区")
-        z1, z2, z3, z4 = st.columns(4)
-        with z1:
-            st.markdown(
-                zone_card(
-                    "主动锁量区（绿色）",
-                    "#15803D",
-                    "#F0FDF4",
-                    "#BBF7D0",
-                    [
-                        f"低战略AISC + 低政策风险 + 有产能贡献（{len(active_lock_df)} 个样本）",
-                        "CATL动作：长协谈判 / 包销协议 / 战略合作 / 少数股权投资评估",
-                    ],
-                ),
-                unsafe_allow_html=True,
-            )
-        with z2:
-            st.markdown(
-                zone_card(
-                    "结构性谈判区（蓝色）",
-                    CATL_BLUE,
-                    "#EFF6FF",
-                    "#BFDBFE",
-                    [
-                        f"低成本但政策风险较高，需要更强保护条款（{len(negotiation_df)} 个样本）",
-                        "CATL动作：强化价格调整机制 / 本地加工安排 / 政府关系复核",
-                    ],
-                ),
-                unsafe_allow_html=True,
-            )
-        with z3:
-            st.markdown(
-                zone_card(
-                    "观察等待区（橙色）",
-                    "#C2410C",
-                    "#FFF7ED",
-                    "#FDBA74",
-                    [
-                        f"资源质量较好，但成本或项目进度暂不具备优势（{len(wait_df)} 个样本）",
-                        "CATL动作：保持信息跟踪，不急于进入排他谈判",
-                    ],
-                ),
-                unsafe_allow_html=True,
-            )
-        with z4:
-            st.markdown(
-                zone_card(
-                    "风险预警区（红色）",
-                    "#DC2626",
-                    "#FEF2F2",
-                    "#FECACA",
-                    [
-                        f"高成本 + 高政策风险 + 价格安全垫不足（{len(warning_df)} 个样本）",
-                        "CATL动作：不作为近期锁量重点，仅作为边际供应观察",
-                    ],
-                ),
-                unsafe_allow_html=True,
-            )
-
-        top_country = country_df.sort_values("exposure_score", ascending=False).iloc[0]["country"] if not country_df.empty else "样本资源国"
         st.markdown(
             f"""
             <div class="insight-box">
             <b>管理层解读：</b>
-            这个模块并不是在模拟宁德时代真实的矿山资产配置。这里的33个项目是全球锂资源观察样本，
-            通过战略AISC、政策风险溢价、产能规模与价格安全垫标准化排序，转化为锁量、采购、尽调与风险监控优先级。
-            对宁德时代而言，当前更值得优先关注的资源类型是 <b>{top_resource}</b>，国家层面需重点复核 <b>{top_country}</b> 等高暴露资源国，
-            核心不是“买哪个矿”，而是判断哪些样本更适合进入长协、包销、参股、联合开发或持续观察清单。
+            当前建议组合以 <b>{top_resource}</b> 为主要配置方向，国家暴露最高的是 <b>{top_country}</b>。
+            产能加权战略AISC约 <b>{weighted_strategic_aisc:.2f} 万元/吨 LCE</b>，
+            约 <b>{covered_ratio:.0%}</b> 的样本战略AISC低于当前LCE价格。
+            后续配置应优先比较价格安全垫、政策风险溢价和产能贡献，而不是单纯按传统矿山成本排序。
             </div>
             """,
             unsafe_allow_html=True,
